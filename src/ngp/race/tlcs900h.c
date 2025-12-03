@@ -47,7 +47,7 @@ extern int fixsoundmahjong;
 #define N_CREGS   8
 #define NGP_OPTIMIZATION_JUMPTABLE
 #define NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
-//#define NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
+//#define NGP_OPTIMIZATION_JUMPTABLE_HYBRID
 // ngpcdis.cpp
 //
 // Emulator for tlcs-900H based on:
@@ -207,9 +207,7 @@ unsigned int   **cregsL   = NULL;
 int state;
 int checkstate;
 int DMAstate;
-#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
-int clocks;
-#endif
+
 // Clock multiplier to reflect the CPU speed
 // 1 - 6144 kHz
 // 2 - 3072 kHz
@@ -7061,26 +7059,11 @@ DECODE_TABLE int (*decode_tableF0[256])() =
 
 int decode80(void)  // (XWA) (XBC) (XDE) (XHL) (XIX) (XIY) (XIZ) (XSP) scr.B
 {
-#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
-lbl_opcode_80_func_decode80:
-lbl_opcode_81_func_decode80:
-lbl_opcode_82_func_decode80:
-lbl_opcode_83_func_decode80:
-lbl_opcode_84_func_decode80:
-lbl_opcode_85_func_decode80:
-lbl_opcode_86_func_decode80:
-lbl_opcode_87_func_decode80:
-#endif
     mem = *cregsL[opcode&7];
     memB = mem_readB(mem);
     lastbyte = readbyte();
-#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
-    clocks+= memoryCycles;
-    clocks+=decode_table80[lastbyte]();
-    return clocks;
-#else
+
     return decode_table80[lastbyte]();
-#endif
 }
 
 int decode88(void)  // (XWA+d) (XBC+d) (XDE+d) (XHL+d) (XIX+d) (XIY+d) (XIZ+d) (XSP+d) scr.B
@@ -8290,11 +8273,8 @@ static void tlcsTI0(void)
 /* perform one cpu step */
 static int tlcs_step(void)
 {
-#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
-    clocks = DMAstate;
-#else
     int clocks = DMAstate;
-#endif
+
     DMAstate = 0;
     memoryCycles = 0;
 
@@ -8492,11 +8472,8 @@ static void *opcode_jumptable[] = {
     &&lbl_opcode_FC_swi,    &&lbl_opcode_FD_swi,    &&lbl_opcode_FE_swi,    &&lbl_opcode_FF_swi
 };
 
-#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
-    clocks = DMAstate;
-#else
+
     int clocks = DMAstate;
-#endif
 
     DMAstate = 0;
     memoryCycles = 0;
@@ -8537,6 +8514,7 @@ static void *opcode_jumptable[] = {
 
 
     opcode = readbyte();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_HYBRID
     if (opcode & 0x80)
     {
         // function table path for locality
@@ -8544,6 +8522,7 @@ static void *opcode_jumptable[] = {
         clocks+= memoryCycles;
         return /*tlcsClockMulti * */ clocks;     
     }
+#endif
     goto *opcode_jumptable[opcode];
 
     // tested working up to code 0xDF
