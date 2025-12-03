@@ -1,5 +1,6 @@
 This branch contains an experiemental branch of the NGP core where the function table has been converted to a jump table. (uses flag NGP_OPTIMIZATION_JUMPTABLE)
-Additionally there is are two optional jumptable flags.
+
+Additionally there are two optional jumptable flags.
 NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
 NGP_OPTIMIZATION_JUMPTABLE_HYBRID
 
