@@ -45,7 +45,9 @@ extern int fixsoundmahjong;
 
 #define N_ALLREGS 256
 #define N_CREGS   8
-
+#define NGP_OPTIMIZATION_JUMPTABLE
+#define NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+//#define NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
 // ngpcdis.cpp
 //
 // Emulator for tlcs-900H based on:
@@ -205,6 +207,9 @@ unsigned int   **cregsL   = NULL;
 int state;
 int checkstate;
 int DMAstate;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
+int clocks;
+#endif
 // Clock multiplier to reflect the CPU speed
 // 1 - 6144 kHz
 // 2 - 3072 kHz
@@ -7056,10 +7061,26 @@ DECODE_TABLE int (*decode_tableF0[256])() =
 
 int decode80(void)  // (XWA) (XBC) (XDE) (XHL) (XIX) (XIY) (XIZ) (XSP) scr.B
 {
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
+lbl_opcode_80_func_decode80:
+lbl_opcode_81_func_decode80:
+lbl_opcode_82_func_decode80:
+lbl_opcode_83_func_decode80:
+lbl_opcode_84_func_decode80:
+lbl_opcode_85_func_decode80:
+lbl_opcode_86_func_decode80:
+lbl_opcode_87_func_decode80:
+#endif
     mem = *cregsL[opcode&7];
     memB = mem_readB(mem);
     lastbyte = readbyte();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
+    clocks+= memoryCycles;
+    clocks+=decode_table80[lastbyte]();
+    return clocks;
+#else
     return decode_table80[lastbyte]();
+#endif
 }
 
 int decode88(void)  // (XWA+d) (XBC+d) (XDE+d) (XHL+d) (XIX+d) (XIY+d) (XIZ+d) (XSP+d) scr.B
@@ -8269,8 +8290,11 @@ static void tlcsTI0(void)
 /* perform one cpu step */
 static int tlcs_step(void)
 {
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
+    clocks = DMAstate;
+#else
     int clocks = DMAstate;
-
+#endif
     DMAstate = 0;
     memoryCycles = 0;
 
@@ -8332,7 +8356,12 @@ void tlcs_execute(int cycles)
 
     while(cycles > 0)
     {
+        
+#ifdef NGP_OPTIMIZATION_JUMPTABLE
+        for (elapsed = tlcs_step_jumptable(); elapsed < (515 >> (tlcsClockMulti - 1)); elapsed += tlcs_step_jumptable());
+#else
         for (elapsed = tlcs_step(); elapsed < (515 >> (tlcsClockMulti - 1)); elapsed += tlcs_step());
+#endif        
         tlcsTimers(elapsed);
         elapsed *= tlcsClockMulti;
         soundStep(elapsed);
@@ -8374,3 +8403,1894 @@ void tlcs_execute(int cycles)
     }
     ngOverflow = hCounter + cycles;
 }
+
+
+
+#ifdef NGP_OPTIMIZATION_JUMPTABLE
+// Jump table macro, lbl is the label without the:
+//                   code contains the code with ; at the end(optional for final statement but harmless)
+//                   clk is the number of clocks to add, the return value from the original funciton added immediately
+//                   before jumping to the end of the table.
+#define OPCODE(lbl, code, clk) \
+lbl: \
+    code; \
+    clocks += clk; \
+    goto lbl_end_of_table;
+
+// Modified Macros for jump table
+#define NG_PUSH_BYTE_JUMPTABLE(src,s) tlcsFastMemWriteB(--gen_regsXSP,src); clocks+= s;
+#define NG_PUSH_WORD_JUMPTABLE(src,s) tlcsFastMemWriteW(gen_regsXSP-=2,src); clocks+= s;
+#define NG_PUSH_LONG_JUMPTABLE(src,s) tlcsFastMemWriteL(gen_regsXSP-=4,src); clocks+= s;
+/* perform one cpu step */
+static int tlcs_step_jumptable(void)
+{
+// Jump table definition
+static void *opcode_jumptable[] = {
+    &&lbl_opcode_00_nop, &&lbl_opcode_01_normal, &&lbl_opcode_02_pushsr, &&lbl_opcode_03_popsr,
+    &&lbl_opcode_04_tmax, &&lbl_opcode_05_halt, &&lbl_opcode_06_ei, &&lbl_opcode_07_reti,
+    &&lbl_opcode_08_ld8I, &&lbl_opcode_09_pushI, &&lbl_opcode_0A_ldw8I, &&lbl_opcode_0B_pushwI,  
+    &&lbl_opcode_0C_incf, &&lbl_opcode_0D_decf, &&lbl_opcode_0E_ret, &&lbl_opcode_0F_retd,
+    &&lbl_opcode_10_rcf,&&lbl_opcode_11_scf, &&lbl_opcode_12_ccf, &&lbl_opcode_13_zcf,
+    &&lbl_opcode_14_pushA, &&lbl_opcode_15_popA, &&lbl_opcode_16_exFF, &&lbl_opcode_17_ldf,
+    &&lbl_opcode_18_pushF, &&lbl_opcode_19_popF, &&lbl_opcode_1A_jp16, &&lbl_opcode_1B_jp24,
+    &&lbl_opcode_1C_call16, &&lbl_opcode_1D_call24, &&lbl_opcode_1E_calr, &&lbl_opcode_1F_udef, 
+    &&lbl_opcode_20_ldRIB, &&lbl_opcode_21_ldRIB, &&lbl_opcode_22_ldRIB, &&lbl_opcode_23_ldRIB,
+    &&lbl_opcode_24_ldRIB, &&lbl_opcode_25_ldRIB, &&lbl_opcode_26_ldRIB, &&lbl_opcode_27_ldRIB,
+    &&lbl_opcode_28_pushRW, &&lbl_opcode_29_pushRW, &&lbl_opcode_2A_pushRW, &&lbl_opcode_2B_pushRW,
+    &&lbl_opcode_2C_pushRW, &&lbl_opcode_2D_pushRW, &&lbl_opcode_2E_pushRW, &&lbl_opcode_2F_pushRW,
+    &&lbl_opcode_30_ldRIW, &&lbl_opcode_31_ldRIW, &&lbl_opcode_32_ldRIW, &&lbl_opcode_33_ldRIW,
+    &&lbl_opcode_34_ldRIW, &&lbl_opcode_35_ldRIW, &&lbl_opcode_36_ldRIW, &&lbl_opcode_37_ldRIW,
+    &&lbl_opcode_38_pushRL, &&lbl_opcode_39_pushRL, &&lbl_opcode_3A_pushRL, &&lbl_opcode_3B_pushRL,
+    &&lbl_opcode_3C_pushRL, &&lbl_opcode_3D_pushRL, &&lbl_opcode_3E_pushRL, &&lbl_opcode_3F_pushRL,
+    &&lbl_opcode_40_ldRIL, &&lbl_opcode_41_ldRIL, &&lbl_opcode_42_ldRIL, &&lbl_opcode_43_ldRIL,
+    &&lbl_opcode_44_ldRIL, &&lbl_opcode_45_ldRIL, &&lbl_opcode_46_ldRIL, &&lbl_opcode_47_ldRIL,
+    &&lbl_opcode_48_popRW, &&lbl_opcode_49_popRW, &&lbl_opcode_4A_popRW, &&lbl_opcode_4B_popRW,
+    &&lbl_opcode_4C_popRW, &&lbl_opcode_4D_popRW, &&lbl_opcode_4E_popRW, &&lbl_opcode_4F_popRW,
+    &&lbl_opcode_50_udef, &&lbl_opcode_51_udef, &&lbl_opcode_52_udef, &&lbl_opcode_53_udef,
+    &&lbl_opcode_54_udef, &&lbl_opcode_55_udef, &&lbl_opcode_56_udef, &&lbl_opcode_57_udef,
+    &&lbl_opcode_58_popRL, &&lbl_opcode_59_popRL, &&lbl_opcode_5A_popRL, &&lbl_opcode_5B_popRL,
+    &&lbl_opcode_5C_popRL, &&lbl_opcode_5D_popRL, &&lbl_opcode_5E_popRL, &&lbl_opcode_5F_popRL,
+    &&lbl_opcode_60_jrcc0,  &&lbl_opcode_61_jrcc1,  &&lbl_opcode_62_jrcc2,  &&lbl_opcode_63_jrcc3,
+    &&lbl_opcode_64_jrcc4,  &&lbl_opcode_65_jrcc5,  &&lbl_opcode_66_jrcc6,  &&lbl_opcode_67_jrcc7,
+    &&lbl_opcode_68_jrcc8,  &&lbl_opcode_69_jrcc9,  &&lbl_opcode_6A_jrccA,  &&lbl_opcode_6B_jrccB,
+    &&lbl_opcode_6C_jrccC,  &&lbl_opcode_6D_jrccD,  &&lbl_opcode_6E_jrccE,  &&lbl_opcode_6F_jrccF,
+    &&lbl_opcode_70_jrlcc0,  &&lbl_opcode_71_jrlcc1,  &&lbl_opcode_72_jrlcc2,  &&lbl_opcode_73_jrlcc3,
+    &&lbl_opcode_74_jrlcc4,  &&lbl_opcode_75_jrlcc5,  &&lbl_opcode_76_jrlcc6,  &&lbl_opcode_77_jrlcc7,
+    &&lbl_opcode_78_jrlcc8,  &&lbl_opcode_79_jrlcc9,  &&lbl_opcode_7A_jrlccA,  &&lbl_opcode_7B_jrlccB,
+    &&lbl_opcode_7C_jrlccC,  &&lbl_opcode_7D_jrlccD,  &&lbl_opcode_7E_jrlccE,  &&lbl_opcode_7F_jrlccF,
+    &&lbl_opcode_80_decode80, &&lbl_opcode_81_decode80, &&lbl_opcode_82_decode80, &&lbl_opcode_83_decode80,
+    &&lbl_opcode_84_decode80, &&lbl_opcode_85_decode80, &&lbl_opcode_86_decode80, &&lbl_opcode_87_decode80,
+    &&lbl_opcode_88_decode88, &&lbl_opcode_89_decode88, &&lbl_opcode_8A_decode88, &&lbl_opcode_8B_decode88,
+    &&lbl_opcode_8C_decode88, &&lbl_opcode_8D_decode88, &&lbl_opcode_8E_decode88, &&lbl_opcode_8F_decode88,
+    &&lbl_opcode_90_decode90, &&lbl_opcode_91_decode90, &&lbl_opcode_92_decode90, &&lbl_opcode_93_decode90,
+    &&lbl_opcode_94_decode90, &&lbl_opcode_95_decode90, &&lbl_opcode_96_decode90, &&lbl_opcode_97_decode90,
+    &&lbl_opcode_98_decode98, &&lbl_opcode_99_decode98, &&lbl_opcode_9A_decode98, &&lbl_opcode_9B_decode98,
+    &&lbl_opcode_9C_decode98, &&lbl_opcode_9D_decode98, &&lbl_opcode_9E_decode98, &&lbl_opcode_9F_decode98,
+    &&lbl_opcode_A0_decodeA0, &&lbl_opcode_A1_decodeA0, &&lbl_opcode_A2_decodeA0, &&lbl_opcode_A3_decodeA0,
+    &&lbl_opcode_A4_decodeA0, &&lbl_opcode_A5_decodeA0, &&lbl_opcode_A6_decodeA0, &&lbl_opcode_A7_decodeA0,
+    &&lbl_opcode_A8_decodeA8, &&lbl_opcode_A9_decodeA8, &&lbl_opcode_AA_decodeA8, &&lbl_opcode_AB_decodeA8,
+    &&lbl_opcode_AC_decodeA8, &&lbl_opcode_AD_decodeA8, &&lbl_opcode_AE_decodeA8, &&lbl_opcode_AF_decodeA8,
+    &&lbl_opcode_B0_decodeB0, &&lbl_opcode_B1_decodeB0, &&lbl_opcode_B2_decodeB0, &&lbl_opcode_B3_decodeB0,
+    &&lbl_opcode_B4_decodeB0, &&lbl_opcode_B5_decodeB0, &&lbl_opcode_B6_decodeB0, &&lbl_opcode_B7_decodeB0,
+    &&lbl_opcode_B8_decodeB8, &&lbl_opcode_B9_decodeB8, &&lbl_opcode_BA_decodeB8, &&lbl_opcode_BB_decodeB8,
+    &&lbl_opcode_BC_decodeB8, &&lbl_opcode_BD_decodeB8, &&lbl_opcode_BE_decodeB8, &&lbl_opcode_BF_decodeB8,
+    &&lbl_opcode_C0_decodeC0, &&lbl_opcode_C1_decodeC1, &&lbl_opcode_C2_decodeC2, &&lbl_opcode_C3_decodeC3,
+    &&lbl_opcode_C4_decodeC4, &&lbl_opcode_C5_decodeC5, &&lbl_opcode_C6_udef,  &&lbl_opcode_C7_decodeC7,
+    &&lbl_opcode_C8_decodeC8, &&lbl_opcode_C9_decodeC8, &&lbl_opcode_CA_decodeC8, &&lbl_opcode_CB_decodeC8,
+    &&lbl_opcode_CC_decodeC8, &&lbl_opcode_CD_decodeC8, &&lbl_opcode_CE_decodeC8, &&lbl_opcode_CF_decodeC8,
+    &&lbl_opcode_D0_decodeD0, &&lbl_opcode_D1_decodeD1, &&lbl_opcode_D2_decodeD2, &&lbl_opcode_D3_decodeD3,
+    &&lbl_opcode_D4_decodeD4, &&lbl_opcode_D5_decodeD5, &&lbl_opcode_D6_udef,  &&lbl_opcode_D7_decodeD7,
+    &&lbl_opcode_D8_decodeD8, &&lbl_opcode_D9_decodeD8, &&lbl_opcode_DA_decodeD8, &&lbl_opcode_DB_decodeD8,
+    &&lbl_opcode_DC_decodeD8, &&lbl_opcode_DD_decodeD8, &&lbl_opcode_DE_decodeD8, &&lbl_opcode_DF_decodeD8,
+    &&lbl_opcode_E0_decodeE0, &&lbl_opcode_E1_decodeE1, &&lbl_opcode_E2_decodeE2, &&lbl_opcode_E3_decodeE3,
+    &&lbl_opcode_E4_decodeE4, &&lbl_opcode_E5_decodeE5, &&lbl_opcode_E6_udef,  &&lbl_opcode_E7_decodeE7,
+    &&lbl_opcode_E8_decodeE8, &&lbl_opcode_E9_decodeE8, &&lbl_opcode_EA_decodeE8, &&lbl_opcode_EB_decodeE8,
+    &&lbl_opcode_EC_decodeE8, &&lbl_opcode_ED_decodeE8, &&lbl_opcode_EE_decodeE8, &&lbl_opcode_EF_decodeE8,
+    &&lbl_opcode_F0_decodeF0, &&lbl_opcode_F1_decodeF1, &&lbl_opcode_F2_decodeF2, &&lbl_opcode_F3_decodeF3,
+    &&lbl_opcode_F4_decodeF4, &&lbl_opcode_F5_decodeF5, &&lbl_opcode_F6_udef,  &&lbl_opcode_F7_ldx,
+    &&lbl_opcode_F8_swi,    &&lbl_opcode_F9_swi,    &&lbl_opcode_FA_swi,    &&lbl_opcode_FB_swi,
+    &&lbl_opcode_FC_swi,    &&lbl_opcode_FD_swi,    &&lbl_opcode_FE_swi,    &&lbl_opcode_FF_swi
+};
+
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_JUMPTARGETS
+    clocks = DMAstate;
+#else
+    int clocks = DMAstate;
+#endif
+
+    DMAstate = 0;
+    memoryCycles = 0;
+
+    // check and handle a pending interrupt
+    if (interruptPendingLevel > (unsigned char)((gen_regsSR & 0x7000)>>12))
+    {
+        int i;
+        // push PC
+		tlcsFastMemWriteL(gen_regsXSP-=4,gen_regsPC);
+        // push SR
+		tlcsFastMemWriteW(gen_regsXSP-=2,gen_regsSR);
+        gen_regsSR = (gen_regsSR & 0x8fff) | (interruptPendingLevel<<12);
+        gen_regsPC = mem_readL(0x00FFFF00 + pendingInterrupts[interruptPendingLevel-1][0]);
+        my_pc = get_address(gen_regsPC);
+
+        // remove interrupt vector from interrupt queue
+        for(i=1; i<INT_QUEUE_MAX; i++)
+        {
+            pendingInterrupts[interruptPendingLevel-1][i-1] =
+                pendingInterrupts[interruptPendingLevel-1][i];
+        }
+
+        pendingInterrupts[interruptPendingLevel-1][INT_QUEUE_MAX-1] = 0;
+        // calculate new interruptPendingLevel
+        interruptPendingLevel = 0;
+
+        for(i=6; i>=0; i--)
+        {
+            if (pendingInterrupts[i][0] != 0)
+            {
+                interruptPendingLevel = i+1;
+                break;
+            }
+        }
+        clocks+= 18;
+    }
+
+
+    opcode = readbyte();
+    if (opcode & 0x80)
+    {
+        // function table path for locality
+        clocks+= instr_table[opcode]();
+        clocks+= memoryCycles;
+        return /*tlcsClockMulti * */ clocks;     
+    }
+    goto *opcode_jumptable[opcode];
+
+    // tested working up to code 0xDF
+    // if (opcode <= 0xDF)
+    // {
+    //     goto *opcode_jumptable[opcode];
+    // }
+    // else
+    // {
+    //     clocks+= instr_table[opcode]();
+    //     clocks+= memoryCycles;
+    //     return /*tlcsClockMulti * */ clocks;       
+    // }
+
+    // Timer processing
+    //tlcsTimers(clocks); //Flavor:  should it be (tlcsClockMulti*clocks)???
+// instructions to implement:
+lbl_opcode_00_nop:
+    clocks += 1; // instead of return 1 then add it to clocks, we add then goto end of table
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_01_normal:
+    gen_regsSR = gen_regsSR & 0x7fff;
+    clocks += 4;    // instead of return 4 then add it to clocks, we add then goto end of table
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_02_pushsr:
+    NG_PUSH_WORD_JUMPTABLE((unsigned short)gen_regsSR&0x0000ffff, 4);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_03_popsr:
+    gen_regsSR = mem_readW(gen_regsXSP);
+    gen_regsXSP+=2;
+    set_cregs();
+    clocks +=  6; // Instead of return 6 then add it to clocks, we add then goto end of table
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_04_tmax:
+    gen_regsSR = gen_regsSR | 0x0400;
+    clocks += 4; // Instead of return 4 then add it to clocks, we add then goto end of table
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_05_halt:
+    --gen_regsPC;
+    --my_pc;
+    clocks += 8;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_06_ei:
+    gen_regsSR = (gen_regsSR & 0x8fff) | (readbyte()<<12);
+    clocks += 5;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_07_reti:
+    gen_regsSR = mem_readW(gen_regsXSP);
+    gen_regsXSP+= 2;
+    gen_regsPC = mem_readL(gen_regsXSP);
+    gen_regsXSP+= 4;
+    my_pc = get_address(gen_regsPC);
+    set_cregs();
+    clocks += 12;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_08_ld8I:
+    {
+    unsigned int num8 = readbyte();
+    tlcsMemWriteBaddrB(num8,readbyte());
+    clocks += 5;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_09_pushI:
+    NG_PUSH_BYTE_JUMPTABLE(readbyte(), 4);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_0A_ldw8I:
+    {
+    unsigned int num8 = readbyte();
+    tlcsMemWriteWaddrB(num8,readword());
+    clocks+= 6; // instead of return 6 then add it to clocks, we add then goto end of table
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_0B_pushwI:
+    NG_PUSH_WORD_JUMPTABLE(readword(), 5);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_0C_incf:
+    {
+    unsigned int i = gen_regsSR & 0x0700;
+
+    i = (i + 0x0100) & 0x0700;
+    // for MAX mode
+    i = i & 0x0300;
+    gen_regsSR = (gen_regsSR & 0xf8ff) | i;
+    set_cregs();
+    clocks += 2;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_0D_decf:
+    {
+        unsigned int i = gen_regsSR & 0x0700;
+
+        i = (i - 0x0100) & 0x0700;
+        // for MAX mode
+        i = i & 0x0300;
+        gen_regsSR = (gen_regsSR & 0xf8ff) | i;
+        set_cregs();
+        clocks +=2;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_0E_ret:
+    gen_regsPC = mem_readL(gen_regsXSP);
+    my_pc = get_address(gen_regsPC);
+    gen_regsXSP+= 4;
+    clocks += 9;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_0F_retd:
+    {
+        signed short d16 = readword();
+
+        gen_regsPC = mem_readL(gen_regsXSP);
+        my_pc = get_address(gen_regsPC);
+        gen_regsXSP+= d16 + 4;
+        clocks += 9;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_10_rcf:
+   gen_regsSR&= ~(HF|NF|CF);
+    clocks += 2;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_11_scf:
+   gen_regsSR = (gen_regsSR & ~(HF|NF)) | CF;
+    clocks += 2;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_12_ccf:
+    gen_regsSR = (gen_regsSR & ~NF) ^ CF;
+    clocks += 2;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_13_zcf:
+    gen_regsSR = (gen_regsSR & ~(NF|CF)) | ((gen_regsSR & ZF) ? 0 : CF);
+    clocks += 2;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_14_pushA:
+    NG_PUSH_BYTE_JUMPTABLE(*cregsB[1], 3);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_15_popA:
+   *cregsB[1] = mem_readB(gen_regsXSP);
+    gen_regsXSP+=1;
+    clocks += 4;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_16_exFF:
+    {
+         unsigned char i = F2;
+
+        F2 = (unsigned char)(gen_regsSR&0xff);
+        gen_regsSR = (gen_regsSR&0xff00)|i;
+        clocks += 2;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_17_ldf:
+    gen_regsSR = (gen_regsSR & 0xf8ff) | ((readbyte() & 7) << 8);
+    set_cregs();
+    clocks += 2;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_18_pushF:
+    NG_PUSH_BYTE_JUMPTABLE((unsigned char)gen_regsSR&0x000000ff, 3);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_19_popF:
+    gen_regsSR = (gen_regsSR&0xff00)|mem_readB(gen_regsXSP);
+    gen_regsXSP+=1;
+    clocks += 4;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_1A_jp16:
+    gen_regsPC = readword();
+    my_pc = get_address(gen_regsPC);
+    clocks += 7;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_1B_jp24:
+    gen_regsPC = read24();
+    my_pc = get_address(gen_regsPC);
+    clocks += 7;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_1C_call16:
+    {
+        unsigned int address = readword();
+
+        tlcsFastMemWriteL(gen_regsXSP-=4,gen_regsPC);
+        my_pc = get_address(gen_regsPC = address);
+        clocks += 12;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_1D_call24:
+    {
+        unsigned int address = read24();
+
+        tlcsFastMemWriteL(gen_regsXSP-=4,gen_regsPC);
+        my_pc = get_address(gen_regsPC = address);
+        clocks += 12;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_1E_calr:
+    {
+        signed short d16 = readword();
+
+        tlcsFastMemWriteL(gen_regsXSP-=4,gen_regsPC);
+        gen_regsPC+= d16;
+        my_pc+= d16;
+        clocks += 12;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_1F_udef:
+lbl_opcode_50_udef:
+lbl_opcode_51_udef:
+lbl_opcode_52_udef:
+lbl_opcode_53_udef:
+lbl_opcode_54_udef:
+lbl_opcode_55_udef:
+lbl_opcode_56_udef:
+lbl_opcode_57_udef:
+lbl_opcode_C6_udef:
+lbl_opcode_D6_udef:
+lbl_opcode_E6_udef:
+lbl_opcode_F6_udef:
+    m_bIsActive = FALSE;
+    clocks += 1;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_20_ldRIB:
+lbl_opcode_21_ldRIB:
+lbl_opcode_22_ldRIB:
+lbl_opcode_23_ldRIB:
+lbl_opcode_24_ldRIB:
+lbl_opcode_25_ldRIB:
+lbl_opcode_26_ldRIB:
+lbl_opcode_27_ldRIB:
+   *cregsB[opcode&7] = readbyte();
+    clocks += 2;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_28_pushRW:
+lbl_opcode_29_pushRW:
+lbl_opcode_2A_pushRW:
+lbl_opcode_2B_pushRW:
+lbl_opcode_2C_pushRW:
+lbl_opcode_2D_pushRW:
+lbl_opcode_2E_pushRW:
+lbl_opcode_2F_pushRW:
+    NG_PUSH_WORD_JUMPTABLE(*cregsW[opcode&7], 3);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_30_ldRIW:
+lbl_opcode_31_ldRIW:
+lbl_opcode_32_ldRIW:
+lbl_opcode_33_ldRIW:
+lbl_opcode_34_ldRIW:
+lbl_opcode_35_ldRIW:
+lbl_opcode_36_ldRIW:
+lbl_opcode_37_ldRIW:
+    *cregsW[opcode&7] = readword();
+    clocks += 3;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_38_pushRL:
+lbl_opcode_39_pushRL:
+lbl_opcode_3A_pushRL:
+lbl_opcode_3B_pushRL:
+lbl_opcode_3C_pushRL:
+lbl_opcode_3D_pushRL:
+lbl_opcode_3E_pushRL:
+lbl_opcode_3F_pushRL:
+    NG_PUSH_LONG_JUMPTABLE(*cregsL[opcode&7], 5);
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_40_ldRIL:
+lbl_opcode_41_ldRIL:
+lbl_opcode_42_ldRIL:
+lbl_opcode_43_ldRIL:
+lbl_opcode_44_ldRIL:
+lbl_opcode_45_ldRIL:
+lbl_opcode_46_ldRIL:
+lbl_opcode_47_ldRIL:
+    *cregsL[opcode&7] = readlong();
+    clocks += 5;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_48_popRW:
+lbl_opcode_49_popRW:
+lbl_opcode_4A_popRW:
+lbl_opcode_4B_popRW:
+lbl_opcode_4C_popRW:
+lbl_opcode_4D_popRW:
+lbl_opcode_4E_popRW:
+lbl_opcode_4F_popRW:
+    *cregsW[opcode&7] = mem_readW(gen_regsXSP);
+    gen_regsXSP+=2;
+    clocks += 4;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+
+// *** lbl_opcode_50_def-57_def grouped with 0x1f udef above
+
+lbl_opcode_58_popRL:
+lbl_opcode_59_popRL:
+lbl_opcode_5A_popRL:
+lbl_opcode_5B_popRL:
+lbl_opcode_5C_popRL:
+lbl_opcode_5D_popRL:
+lbl_opcode_5E_popRL:
+lbl_opcode_5F_popRL:
+    *cregsL[opcode&7] = mem_readL(gen_regsXSP);
+    gen_regsXSP+=4;
+    clocks += 6;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_60_jrcc0:
+    skipJumpByte();
+    clocks += 4;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_61_jrcc1:
+    if (cond1())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+    skipJumpByte();
+    clocks+= 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_62_jrcc2:
+     if (cond2())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_63_jrcc3:
+    if (cond3())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif 
+lbl_opcode_64_jrcc4:
+    if (cond4())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_65_jrcc5:
+    if (cond5())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_66_jrcc6:
+    if (cond6())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_67_jrcc7:
+    if (cond7())
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_68_jrcc8:
+    doJumpByte();
+    clocks += 8;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_69_jrcc9:
+    if(notCond9())
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+    else
+    {
+    doJumpByte();
+    clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_6A_jrccA:
+   if(notCondA())
+    {
+        skipJumpByte();
+        return 4;
+    }
+    else
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_6B_jrccB:
+    if(notCondB())
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_6C_jrccC:
+    if(notCondC())
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_6D_jrccD:
+    if(notCondD())
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_6E_jrccE:
+    if(notCondE())
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_6F_jrccF:
+    if(notCondF())
+    {
+        skipJumpByte();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpByte();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_70_jrlcc0:
+    skipJumpWord();
+    clocks += 4;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_71_jrlcc1:
+    if (cond1())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {   
+    skipJumpWord();
+    clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_72_jrlcc2:
+     if (cond2())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_73_jrlcc3:
+    if (cond3())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_74_jrlcc4:
+    if (cond4())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpWord();
+        clocks += 4;
+    }   
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_75_jrlcc5:
+    if (cond5())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_76_jrlcc6:
+    if (cond6())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_77_jrlcc7:
+    if (cond7())
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+    else
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_78_jrlcc8:
+        doJumpWord();
+        clocks += 8;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_79_jrlcc9:
+    if (notCond9())
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_7A_jrlccA:
+    if (notCondA())
+    {   
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_7B_jrlccB:
+    if (notCondB())
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_7C_jrlccC:
+    if (notCondC())
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_7D_jrlccD:
+    if (notCondD())
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_7E_jrlccE:
+    if (notCondE())
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {   
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_7F_jrlccF:
+    if (notCondF())
+    {
+        skipJumpWord();
+        clocks += 4;
+    }
+    else
+    {
+        doJumpWord();
+        clocks += 8;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else   
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_80_decode80:
+lbl_opcode_81_decode80:
+lbl_opcode_82_decode80:
+lbl_opcode_83_decode80:
+lbl_opcode_84_decode80:
+lbl_opcode_85_decode80:
+lbl_opcode_86_decode80:
+lbl_opcode_87_decode80:
+    mem = *cregsL[opcode&7];
+    memB = mem_readB(mem);
+    lastbyte = readbyte();
+    clocks += decode_table80[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_88_decode88:
+lbl_opcode_89_decode88:
+lbl_opcode_8A_decode88:
+lbl_opcode_8B_decode88:
+lbl_opcode_8C_decode88:
+lbl_opcode_8D_decode88:
+lbl_opcode_8E_decode88:
+lbl_opcode_8F_decode88:
+    mem = (*cregsL[opcode&7])+(signed char)readbyteSetLastbyte();
+    memB = mem_readB(mem);
+    clocks += 2 + decode_table80[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_90_decode90:
+lbl_opcode_91_decode90:
+lbl_opcode_92_decode90:
+lbl_opcode_93_decode90:
+lbl_opcode_94_decode90:
+lbl_opcode_95_decode90:
+lbl_opcode_96_decode90:
+lbl_opcode_97_decode90:
+    mem = *cregsL[opcode&7];
+    memW = mem_readW(mem);
+    lastbyte = readbyte();
+    clocks += decode_table90[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_98_decode98:
+lbl_opcode_99_decode98:
+lbl_opcode_9A_decode98:
+lbl_opcode_9B_decode98:
+lbl_opcode_9C_decode98:
+lbl_opcode_9D_decode98:
+lbl_opcode_9E_decode98:
+lbl_opcode_9F_decode98:
+    mem = (*cregsL[opcode&7])+(signed char)readbyteSetLastbyte();
+    memW = mem_readW(mem);
+    clocks += 2 + decode_table98[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_A0_decodeA0:
+lbl_opcode_A1_decodeA0:
+lbl_opcode_A2_decodeA0:
+lbl_opcode_A3_decodeA0:
+lbl_opcode_A4_decodeA0:
+lbl_opcode_A5_decodeA0:
+lbl_opcode_A6_decodeA0:
+lbl_opcode_A7_decodeA0:
+    mem = *cregsL[opcode&7];
+    memL = mem_readL(mem);
+    lastbyte = readbyte();
+    clocks += decode_tableA0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_A8_decodeA8:
+lbl_opcode_A9_decodeA8:
+lbl_opcode_AA_decodeA8:
+lbl_opcode_AB_decodeA8:
+lbl_opcode_AC_decodeA8:
+lbl_opcode_AD_decodeA8:
+lbl_opcode_AE_decodeA8:
+lbl_opcode_AF_decodeA8:
+    mem = (*cregsL[opcode&7])+(signed char)readbyteSetLastbyte();
+    memL = mem_readL(mem);
+    clocks += 2 + decode_tableA0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_B0_decodeB0:
+lbl_opcode_B1_decodeB0:
+lbl_opcode_B2_decodeB0:
+lbl_opcode_B3_decodeB0:
+lbl_opcode_B4_decodeB0:
+lbl_opcode_B5_decodeB0:
+lbl_opcode_B6_decodeB0:
+lbl_opcode_B7_decodeB0:
+    mem = *cregsL[opcode&7];
+    lastbyte = readbyte();
+    clocks += decode_tableB0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_B8_decodeB8:
+lbl_opcode_B9_decodeB8:
+lbl_opcode_BA_decodeB8:
+lbl_opcode_BB_decodeB8:
+lbl_opcode_BC_decodeB8:
+lbl_opcode_BD_decodeB8:
+lbl_opcode_BE_decodeB8:
+lbl_opcode_BF_decodeB8:
+    mem = (*cregsL[opcode&7])+(signed char)readbyteSetLastbyte();
+    clocks += 2 + decode_tableB8[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C0_decodeC0:
+    mem = readbyteSetLastbyte();
+    memB = mem_readB(mem);
+    clocks += 2 + decode_tableC0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C1_decodeC1:
+    mem = readwordSetLastbyte();
+    memB = mem_readB(mem);
+    clocks += 2 + decode_tableC0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C2_decodeC2:
+    mem = read24SetLastbyte();
+    memB = mem_readB(mem);
+    clocks += 3 + decode_tableC0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C3_decodeC3:
+    {
+        unsigned char reg = readbyte();
+        signed short d16;
+        int    retval = 0;
+
+        switch(reg&0x03)
+        {
+            case 0x00:
+            mem = *allregsL[reg];
+            retval = 5;
+            break;
+            case 0x01:
+            mem = *allregsL[reg]+(signed short)readword();
+            retval = 5;
+            break;
+            case 0x02:
+            break;
+            case 0x03:
+            switch (reg)
+            {
+                case 0x03:
+                reg = readbyte();
+                mem = *allregsL[reg]+(signed char)(*allregsB[readbyte()]);
+                //   mem = *allregsL[reg]+*allregsB[readbyte()];
+                retval = 8;
+                break;
+                case 0x07:
+                reg = readbyte();
+                mem = *allregsL[reg]+(signed short)(*allregsW[readbyte()]);
+                //   mem = *allregsL[reg]+*allregsW[readbyte()];
+                retval = 8;
+                break;
+                case 0x13:
+                d16 = (signed short)readword();
+                mem = gen_regsPC + d16;
+                retval = 5;
+                break;
+                default:
+                break;
+            }
+        }
+        memB = mem_readB(mem);
+        lastbyte = readbyte();
+        clocks += retval + decode_tableC0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C4_decodeC4:
+    {
+        unsigned char reg = readbyteSetLastbyte();
+
+        mem = ((*allregsL[reg])-= 1<<(reg&3));  // pre-decrement
+        memB = mem_readB(mem);
+        clocks += 3 + decode_tableC0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+    
+lbl_opcode_C5_decodeC5:
+    {
+        unsigned char reg = readbyteSetLastbyte();
+
+        mem = *allregsL[reg];
+        memB = mem_readB(mem);
+        *allregsL[reg]+= 1<<(reg&3);    // post-increment
+        //lastbyte = readbyte();
+        clocks += 3 + decode_tableC0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C7_decodeC7:
+    regB = allregsB[readbyteSetLastbyte()];
+    //lastbyte = readbyte();
+    clocks += 1 + decode_tableC8[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_C8_decodeC8:
+lbl_opcode_C9_decodeC8:
+lbl_opcode_CA_decodeC8:
+lbl_opcode_CB_decodeC8:
+lbl_opcode_CC_decodeC8:
+lbl_opcode_CD_decodeC8:
+lbl_opcode_CE_decodeC8:
+lbl_opcode_CF_decodeC8:
+    regB = cregsB[opcode&7];
+    lastbyte = readbyte();
+    clocks += decode_tableC8[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D0_decodeD0:
+    mem = readbyteSetLastbyte();
+    memW = mem_readW(mem);
+    clocks += 2 + decode_tableD0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D1_decodeD1:
+    mem = readwordSetLastbyte();
+    memW = mem_readW(mem);
+    clocks += 2 + decode_tableD0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D2_decodeD2:
+    mem = read24SetLastbyte();
+    memW = mem_readW(mem);
+    clocks += 3 + decode_tableD0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D3_decodeD3:
+    {
+        unsigned char reg = readbyte();
+        signed short d16;
+        int    retval = 0;
+
+        switch(reg&0x03)
+        {
+            case 0x00:
+            mem = *allregsL[reg];
+            retval = 5;
+            break;
+            case 0x01:
+            mem = *allregsL[reg]+(signed short)readword();
+            retval = 5;
+            break;
+            case 0x02:
+            break;
+            case 0x03:
+            switch (reg)
+            {
+                case 0x03:
+                reg = readbyte();
+                mem = *allregsL[reg]+(signed char)(*allregsB[readbyte()]);
+                //   mem = *allregsL[reg]+*allregsB[readbyte()];
+                retval = 8;
+                break;
+                case 0x07:
+                reg = readbyte();
+                mem = *allregsL[reg]+(signed short)(*allregsW[readbyte()]);
+                //   mem = *allregsL[reg]+*allregsW[readbyte()];
+                retval = 8;
+                break;
+                case 0x13:
+                d16 = (signed short)readword();
+                mem = gen_regsPC + d16;
+                retval = 5;
+                break;
+                default:
+                break;
+            }
+        }
+        memW = mem_readW(mem);
+        lastbyte = readbyte();
+        clocks += retval + decode_tableD0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D4_decodeD4:
+    {
+        unsigned char reg = readbyteSetLastbyte();
+
+        mem = ((*allregsL[reg])-= 1<<(reg&3)); // pre-decrement
+        memW = mem_readW(mem);
+        clocks += 3 + decode_tableD0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D5_decodeD5:
+    {
+        unsigned char reg = readbyteSetLastbyte();
+
+        mem = (*allregsL[reg]);
+        memW = mem_readW(mem);
+        *allregsL[reg]+= 1<<(reg&3);   // post-increment
+        clocks += 3 + decode_tableD0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D7_decodeD7:
+   regW = allregsW[readbyteSetLastbyte()];
+   clocks += 1 + decode_tableD8[lastbyte]();   
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_D8_decodeD8:
+lbl_opcode_D9_decodeD8:
+lbl_opcode_DA_decodeD8:
+lbl_opcode_DB_decodeD8:
+lbl_opcode_DC_decodeD8:
+lbl_opcode_DD_decodeD8:
+lbl_opcode_DE_decodeD8:
+lbl_opcode_DF_decodeD8:
+    regW = cregsW[opcode&7];
+    lastbyte = readbyte();
+    clocks += decode_tableD8[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E0_decodeE0:
+    mem = readbyteSetLastbyte();
+    memL = mem_readL(mem);
+    clocks += 2 + decode_tableE0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E1_decodeE1:
+    mem = readwordSetLastbyte();
+    memL = mem_readL(mem);
+    clocks += 2 + decode_tableE0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E2_decodeE2:
+    mem = read24SetLastbyte();
+    memL = mem_readL(mem);
+    clocks += 3 + decode_tableE0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E3_decodeE3:
+    {
+        unsigned char reg = readbyte();
+        signed short d16;
+        int    retval = 0;
+
+        switch(reg&0x03)
+        {
+            case 0x00:
+            mem = *allregsL[reg];
+            retval = 5;
+            break;
+            case 0x01:
+            mem = *allregsL[reg]+(signed short)readword();
+            retval = 5;
+            break;
+            case 0x02:
+            break;
+            case 0x03:
+            switch (reg)
+            {
+                case 0x03:
+                reg = readbyte();
+                mem = *allregsL[reg]+(signed char)(*allregsB[readbyte()]);
+                //   mem = *allregsL[reg]+*allregsB[readbyte()];
+                retval = 8;
+                break;
+                case 0x07:
+                reg = readbyte();
+                mem = *allregsL[reg]+(signed short)(*allregsW[readbyte()]);
+                //   mem = *allregsL[reg]+*allregsW[readbyte()];
+                retval = 8;
+                break;
+                case 0x13:
+                d16 = (signed short)readword();
+                mem = gen_regsPC + d16;
+                retval = 5;
+                break;
+                default:
+                break;
+            }
+        }
+        memL = mem_readL(mem);
+        lastbyte = readbyte();
+        clocks += retval + decode_tableE0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E4_decodeE4:
+    {
+        unsigned char reg = readbyteSetLastbyte();
+
+        mem = ((*allregsL[reg])-= 1<<(reg&3)); // pre-decrement
+        memL = mem_readL(mem);
+        clocks += 3 + decode_tableE0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E5_decodeE5:
+    {
+        unsigned char reg = readbyteSetLastbyte();
+
+        mem = (*allregsL[reg]);
+        memL = mem_readL(mem);
+        *allregsL[reg]+= 1<<(reg&3);   // post-increment
+        //lastbyte = readbyte();
+        clocks+= 3 + decode_tableE0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E7_decodeE7:
+    regL = allregsL[readbyteSetLastbyte()];
+    clocks += 1 + decode_tableE8[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_E8_decodeE8:
+lbl_opcode_E9_decodeE8:
+lbl_opcode_EA_decodeE8:
+lbl_opcode_EB_decodeE8:
+lbl_opcode_EC_decodeE8:
+lbl_opcode_ED_decodeE8:
+lbl_opcode_EE_decodeE8:
+lbl_opcode_EF_decodeE8:
+    regL = cregsL[opcode&7];
+    lastbyte = readbyte();
+    return decode_tableE8[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F0_decodeF0:
+    mem = readbyteSetLastbyte();
+    clocks += 2 + decode_tableF0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F1_decodeF1:
+   mem = readwordSetLastbyte();
+   clocks += 2 + decode_tableF0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F2_decodeF2:
+   mem = read24SetLastbyte();
+   clocks += 3 + decode_tableF0[lastbyte]();
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F3_decodeF3:
+    {
+        unsigned char reg = readbyte();
+        signed short d16;
+        int    retval = 0;
+
+        switch(reg&0x03)
+        {
+            case 0x00:
+                mem = *allregsL[reg];
+                retval = 5;
+                break;
+            case 0x01:
+                mem = *allregsL[reg]+(signed short)readword();
+                retval = 5;
+                break;
+            case 0x02:
+                break;
+            case 0x03:
+                switch(reg)
+                {
+                    case 0x03:
+                    reg = readbyte();
+                    mem = *allregsL[reg]+(signed char)(*allregsB[readbyte()]);
+                    //   mem = *allregsL[reg]+*allregsB[readbyte()];
+                    retval = 8;
+                    break;
+                    case 0x07:
+                    reg = readbyte();
+                    mem = *allregsL[reg]+(signed short)(*allregsW[readbyte()]);
+                    //   mem = *allregsL[reg]+*allregsW[readbyte()];
+                    retval = 8;
+                    break;
+                    case 0x13:
+                    d16 = (signed short)readword();
+                    mem = gen_regsPC + d16;
+                    retval = 5;
+                    break;
+                    default:
+                    break;
+                }
+        }
+        lastbyte = readbyte();
+        clocks += retval + decode_tableF0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F4_decodeF4:
+    {
+        unsigned char reg;
+
+        reg = readbyteSetLastbyte();
+        mem = (*allregsL[reg]-= 1<<(reg&3));
+        clocks += 3 + decode_tableF0[lastbyte]();
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F5_decodeF5:
+    {
+        unsigned char reg;
+        int  retval;
+
+        reg = readbyteSetLastbyte();
+        mem = (*allregsL[reg]);
+        retval = 3 + decode_tableF0[lastbyte]();
+        *allregsL[reg]+= 1<<(reg&3);
+        clocks += retval;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F7_ldx:
+    {
+        unsigned char num8, data;
+        readbyte();
+        num8 = readbyte();
+        readbyte();
+        data = readbyte();
+        readbyte();
+        mem_writeB(num8,data);
+        clocks += 9;
+    }
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+lbl_opcode_F8_swi:
+lbl_opcode_F9_swi:
+lbl_opcode_FA_swi:
+lbl_opcode_FB_swi:
+lbl_opcode_FC_swi:
+lbl_opcode_FD_swi:
+lbl_opcode_FE_swi:
+lbl_opcode_FF_swi:
+    tlcsFastMemWriteL(gen_regsXSP-=4,gen_regsPC);
+    tlcsFastMemWriteW(gen_regsXSP-=2,gen_regsSR);
+    // SYSM = 1;
+    gen_regsPC = mem_readL(0x00FFFF00 + ((opcode&7)<<2)) & 0x00ffffff;
+    my_pc = get_address(gen_regsPC);
+
+    clocks += 16;
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+    clocks += memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+#else
+    goto lbl_end_of_table;
+#endif
+// unimplemented opcodes for reference
+
+
+
+//    decodeF0, decodeF1, decodeF2, decodeF3, decodeF4, decodeF5, udef,  ldx,
+//    swi,  swi,  swi,  swi,  swi,  swi,  swi,  swi
+
+// implemented opcodes
+// nop,  normal,  pushsr,  popsr,  tmax,  halt,  ei,   reti,
+//    ld8I,  pushI,  ldw8I,  pushwI,  incf,  decf,  ret,  retd,
+//    rcf,  scf,  ccf,  zcf,  pushA,  popA,  exFF,  ldf,
+//    pushF,  popF,  jp16,  jp24,  call16,  call24,  calr,  udef,
+//    ldRIB,  ldRIB,  ldRIB,  ldRIB,  ldRIB,  ldRIB,  ldRIB,  ldRIB,
+//    pushRW,  pushRW,  pushRW,  pushRW,  pushRW,  pushRW,  pushRW,  pushRW,
+//    ldRIW,  ldRIW,  ldRIW,  ldRIW,  ldRIW,  ldRIW,  ldRIW,  ldRIW,
+//    pushRL,  pushRL,  pushRL,  pushRL,  pushRL,  pushRL,  pushRL,  pushRL,
+//    //
+//    ldRIL,  ldRIL,  ldRIL,  ldRIL,  ldRIL,  ldRIL,  ldRIL,  ldRIL,
+//    popRW,  popRW,  popRW,  popRW,  popRW,  popRW,  popRW,  popRW,
+//    udef,  udef,  udef,  udef,  udef,  udef,  udef,  udef,
+//    popRL,  popRL,  popRL,  popRL,  popRL,  popRL,  popRL,  popRL,
+//   jrcc0,  jrcc1,  jrcc2,  jrcc3,  jrcc4,  jrcc5,  jrcc6,  jrcc7,
+//    jrcc8,  jrcc9,  jrccA,  jrccB,  jrccC,  jrccD,  jrccE,  jrccF,
+//    jrlcc0,  jrlcc1,  jrlcc2,  jrlcc3,  jrlcc4,  jrlcc5,  jrlcc6,  jrlcc7,
+//    jrlcc8,  jrlcc9,  jrlccA,  jrlccB,  jrlccC,  jrlccD,  jrlccE,  jrlccF,
+//    //
+//    decode80, decode80, decode80, decode80, decode80, decode80, decode80, decode80,
+//    decode88, decode88, decode88, decode88, decode88, decode88, decode88, decode88,
+//    decode90, decode90, decode90, decode90, decode90, decode90, decode90, decode90,
+//    decode98, decode98, decode98, decode98, decode98, decode98, decode98, decode98,
+//    decodeA0, decodeA0, decodeA0, decodeA0, decodeA0, decodeA0, decodeA0, decodeA0,
+//    decodeA8, decodeA8, decodeA8, decodeA8, decodeA8, decodeA8, decodeA8, decodeA8,
+//    decodeB0, decodeB0, decodeB0, decodeB0, decodeB0, decodeB0, decodeB0, decodeB0,
+//    decodeB8, decodeB8, decodeB8, decodeBB, decodeB8, decodeB8, decodeB8, decodeB8,
+//    //
+//    decodeC0, decodeC1, decodeC2, decodeC3, decodeC4, decodeC5, udef,  decodeC7,
+//    decodeC8, decodeC8, decodeC8, decodeC8, decodeC8, decodeC8, decodeC8, decodeC8,
+//    decodeD0, decodeD1, decodeD2, decodeD3, decodeD4, decodeD5, udef,  decodeD7,
+//    decodeD8, decodeD8, decodeD8, decodeD8, decodeD8, decodeD8, decodeD8, decodeD8,
+//    decodeE0, decodeE1, decodeE2, decodeE3, decodeE4, decodeE5, udef,  decodeE7,
+//    decodeE8, decodeE8, decodeE8, decodeE8, decodeE8, decodeE8, decodeE8, decodeE8,
+//    decodeF0, decodeF1, decodeF2, decodeF3, decodeF4, decodeF5, udef,  ldx,
+//    swi,  swi,  swi,  swi,  swi,  swi,  swi,  swi
+lbl_end_of_table:
+    clocks+= memoryCycles;
+    return /*tlcsClockMulti * */ clocks;
+}
+#endif
