@@ -29,21 +29,21 @@ extern "C" void ngc_input_init(void) {
 extern "C" uint32_t ngc_input_poll(void) {
   uint32_t dummy_ret = 0xFFFFFFFF;
 
-  if (!share::shouldPollInput()) {
-      return lastPadState;
-  }
+  // if (!share::shouldPollInput()) {
+  //     return lastPadState;
+  // }
 
-  M5Cardputer.update();
-  Keyboard_Class::KeysState ks = M5Cardputer.Keyboard.keysState();
-
-  share::checkCommonInput(ks);
-
-  // --- state de base ---
+// Read Keyboard matrix
+M5Cardputer.update();
+Keyboard_Class::KeysState ks = M5Cardputer.Keyboard.keysState();
+share::checkCommonInput(ks);
+// --- state de base ---
 #if NGP_INPUT_ACTIVE_LOW
   ngpInputState = 0xFF;
 #else
   ngpInputState = 0x00;
 #endif
+
 
   if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_SCREEN_TOGGLE)) {
     ngpFullscreen = !ngpFullscreen;

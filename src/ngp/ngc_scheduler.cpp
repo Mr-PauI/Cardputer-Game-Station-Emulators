@@ -30,11 +30,11 @@ extern volatile unsigned g_frame_ready;
 static void taskInput(void* arg)
 {
   (void)arg;
-  TickType_t last = xTaskGetTickCount();
+  //TickType_t last = xTaskGetTickCount();
   while (s_running) {
-    M5.update();
+    //M5.update();
     ngc_input_poll();
-    taskYIELD();
+    vTaskDelay(pdMS_TO_TICKS(5)); // Just a litte faster than every frame
   }
   vTaskDelete(nullptr);
 }
@@ -66,8 +66,8 @@ extern "C" void ngc_scheduler_start(void)
   if (s_running) return;
   s_running = true;
 
-  //   Handled in main loop now
-  //   xTaskCreatePinnedToCore(taskInput, "ngp_input", 4096, nullptr, 5, &s_taskInput, NGC_INPUT_CORE);
+  // Slowed emulation when polled in the main loop by about .10 ms (rough estimate)
+  //xTaskCreatePinnedToCore(taskInput, "ngp_input", 4096, nullptr, 5, &s_taskInput, NGC_INPUT_CORE);
   xTaskCreatePinnedToCore(taskAudio, "ngp_audio", 2048, nullptr, 6, &s_taskAudio, NGC_AUDIO_CORE);
   xTaskCreatePinnedToCore(taskVideo, "ngp_video", 2048, nullptr, 6, &s_taskVideo, NGC_VIDEO_CORE);
 }

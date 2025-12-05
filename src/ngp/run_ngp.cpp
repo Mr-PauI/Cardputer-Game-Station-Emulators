@@ -1,12 +1,12 @@
 #include <Arduino.h> 
 #include <string.h>
+#include <M5Cardputer.h>
 #include "run_ngp.h"
 #include "../race/race-memory.h"
 #include "../race/types.h"
 #include "../race/tlcs900h.h"
 #include "../race/input.h"
 #include "../race/flash.h"
-#include <M5Cardputer.h>
 #include "ngc_sound.h"
 #include "ngc_input.h"
 #include "ngc_display.h"
@@ -197,6 +197,9 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 
   unsigned long status_last = millis();
   unsigned long frames = 0;
+  unsigned long frame_time_total = 0;
+  unsigned long frame_time_min = ULONG_MAX;
+  unsigned long frame_time_max = 0;
   const uint32_t TARGET_US = 16667; // 60 Hz
   const uint32_t CPU_CLOCK_HZ = 6000000; // 6 MHz
   
@@ -219,30 +222,41 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
       #else
               tlcs_execute((CPU_CLOCK_HZ) / 60);
       #endif
-      ngc_input_poll();
-      taskYIELD();
+      ngc_input_poll(); // use if not using input task
+      // taskYIELD();
 
       // Pacing 60 Hz
       uint32_t emuUs = micros() - t0;
+      frame_time_total += emuUs;
+      if (emuUs < frame_time_min) frame_time_min = emuUs;
+      if (emuUs > frame_time_max) frame_time_max = emuUs;
+
       int32_t remaining = TARGET_US - emuUs;
       if (remaining > 0) {
         delayMicroseconds(remaining);
       }
       
       // Log framerate
-      // frames++;
-      // if (millis() - status_last >= 2000)
-      // {
-      //     size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-
-      //     printf("[NGPC_RUN] %lu frames / 2s (~%lu FPS) | HEAP: %u bytes (%.1f KB)\n",
-      //           frames,
-      //           frames / 2,
-      //           (unsigned int)heap_free,
-      //           heap_free / 1024.0f);
-
-      //     frames = 0;
-      //     status_last = millis();
-      // }
+      frames++;
+      if (millis() - status_last >= 2000)
+      {
+          size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+          float avg_ms = frame_time_total / (float)frames / 1000.0f;
+          float min_ms = frame_time_min / 1000.0f;
+          float max_ms = frame_time_max / 1000.0f;
+          printf("[NGP_RUN] %lu frames / 2s (~%lu FPS) | HEAP: %u bytes (%.1f KB) | AVG %.2fms | MIN %.2fms | MAX %.2fms\n",
+          frames,
+          frames / 2,
+          (unsigned int)heap_free,
+          heap_free / 1024.0f,
+          avg_ms,
+          min_ms,
+          max_ms);
+          frame_time_total = 0;
+          frame_time_min = ULONG_MAX;
+          frame_time_max = 0;
+          frames = 0;
+          status_last = millis();
+      }
   }
 }
