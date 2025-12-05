@@ -1,3 +1,5 @@
+* NGP_OPTIMIZATION_JUMPTABLE+NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP (-.10ms/frame in reference title, Metal Slug 1 level 1)
+
 This branch contains an experiemental alteration of the NGP core where the function table has been converted to a jump table. (uses flag NGP_OPTIMIZATION_JUMPTABLE)
 
 Additionally there are two optional jumptable flags.
