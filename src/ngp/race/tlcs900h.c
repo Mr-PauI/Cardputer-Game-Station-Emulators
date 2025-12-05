@@ -1,3 +1,4 @@
+
 //---------------------------------------------------------------------------
 //	This program is free software; you can redistribute it and/or modify
 //	it under the terms of the GNU General Public License as published by
@@ -28,7 +29,6 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-
 #include <stdlib.h>
 #include <time.h>
 #include <retro_inline.h>
@@ -45,8 +45,8 @@ extern int fixsoundmahjong;
 
 #define N_ALLREGS 256
 #define N_CREGS   8
-#define NGP_OPTIMIZATION_JUMPTABLE
-#define NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
+// #define NGP_OPTIMIZATION_JUMPTABLE
+// #define NGP_OPTIMIZATION_JUMPTABLE_EMBEDDED_POSTOP
 //#define NGP_OPTIMIZATION_JUMPTABLE_HYBRID
 // ngpcdis.cpp
 //
@@ -239,15 +239,22 @@ unsigned char lastbyte;
 // wrapper
 int  memoryCycles;
 
-
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_REMOVE_INLINE_READB
+unsigned char __attribute__((noinline))  mem_readB(unsigned int addr)
+#else
 static INLINE unsigned char mem_readB(unsigned int addr)
+#endif
 {
     if (addr > 0x200000)
         memoryCycles++;
     return tlcsMemReadB(addr);
 }
 
+#ifdef NGP_OPTIMIZATION_JUMPTABLE_REMOVE_INLINE_READW
+unsigned short __attribute__((noinline))  mem_readW(unsigned int addr)
+#else
 static INLINE unsigned short mem_readW(unsigned int addr)
+#endif
 {
     if (addr > 0x200000)
         memoryCycles+=2;
@@ -8387,16 +8394,6 @@ void tlcs_execute(int cycles)
 
 
 #ifdef NGP_OPTIMIZATION_JUMPTABLE
-// Jump table macro, lbl is the label without the:
-//                   code contains the code with ; at the end(optional for final statement but harmless)
-//                   clk is the number of clocks to add, the return value from the original funciton added immediately
-//                   before jumping to the end of the table.
-#define OPCODE(lbl, code, clk) \
-lbl: \
-    code; \
-    clocks += clk; \
-    goto lbl_end_of_table;
-
 // Modified Macros for jump table
 #define NG_PUSH_BYTE_JUMPTABLE(src,s) tlcsFastMemWriteB(--gen_regsXSP,src); clocks+= s;
 #define NG_PUSH_WORD_JUMPTABLE(src,s) tlcsFastMemWriteW(gen_regsXSP-=2,src); clocks+= s;
@@ -8405,7 +8402,7 @@ lbl: \
 static int tlcs_step_jumptable(void)
 {
 // Jump table definition
-static void *opcode_jumptable[] = {
+DECODE_TABLE static void *opcode_jumptable[] = {
     &&lbl_opcode_00_nop, &&lbl_opcode_01_normal, &&lbl_opcode_02_pushsr, &&lbl_opcode_03_popsr,
     &&lbl_opcode_04_tmax, &&lbl_opcode_05_halt, &&lbl_opcode_06_ei, &&lbl_opcode_07_reti,
     &&lbl_opcode_08_ld8I, &&lbl_opcode_09_pushI, &&lbl_opcode_0A_ldw8I, &&lbl_opcode_0B_pushwI,  

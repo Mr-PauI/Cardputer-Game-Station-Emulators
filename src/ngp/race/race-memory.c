@@ -107,7 +107,32 @@ unsigned char z80ngpMemReadB(unsigned short addr) {
 
 unsigned short z80ngpMemReadW(unsigned short addr)
 {
+#ifdef NGP_Z80_16BIT_READ
+    unsigned short temp;
+
+    // RAM: 0x0000–0x3FFF maps to mainram[0x3000 + addr]
+    if (addr < 0x4000) {
+        temp = *((unsigned short*)&mainram[0x3000 + addr]);
+        return temp;
+    }
+
+    // Special addresses
+    switch(addr) {
+        case 0x4000:  // sound chip read, return byte + next
+            return 0x0000;
+        case 0x4001:
+            return 0x0000; // lower byte is 0, upper byte is fall through 0
+        case 0x8000:  // CPU RAM byte at 0xBC
+            temp = *((unsigned short*)&cpuram[0xBC]);
+            return temp;
+        case 0xC000:
+            return 0x0000;
+    }
+    return 0x0000;
+
+#else
 	return (z80ngpMemReadB(addr+1) << 8) | z80ngpMemReadB(addr);
+#endif
 }
 
 void z80ngpMemWriteB(unsigned short addr, unsigned char data) {

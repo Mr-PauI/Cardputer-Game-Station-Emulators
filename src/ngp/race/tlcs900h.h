@@ -66,7 +66,7 @@ void tlcs_execute(int cycles, int skipFrames); /* skipFrames=how many frames to 
 #else
 void tlcs_execute(int cycles);
 #endif
-
+static int tlcs_step_jumptable(void);
 #ifdef __cplusplus
 }
 #endif

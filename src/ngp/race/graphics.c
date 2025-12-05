@@ -739,3 +739,4 @@ BOOL graphics_init(void)
 
     return TRUE;
 }
+
