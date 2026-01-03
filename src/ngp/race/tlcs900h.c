@@ -107,7 +107,7 @@ extern uint8_t* s_lut_y_render;
 
 //#define USE_PARITY_TABLE  //this is currently broken!
 #ifdef USE_PARITY_TABLE
-unsigned char parityVtable[256];            // zero and sign flags table for faster setting
+extern unsigned char* parityVtable;            // zero and sign flags table for faster setting
 #endif
 
 // declare all registers

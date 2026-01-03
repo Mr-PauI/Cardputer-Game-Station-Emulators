@@ -45,6 +45,9 @@ unsigned char* cpurom  = NULL;
 const unsigned char* mainrom = NULL;    // ROM mapped top XIP
 unsigned char* cpuram = NULL; 
 unsigned char  ldcRegs[64];
+#ifdef USE_PARITY_TABLE
+unsigned char* parityVtable = NULL;            // zero and sign flags table for faster setting
+#endif
 
 static unsigned char* s_cpuram_256 = NULL;
 
@@ -431,11 +434,18 @@ void ngp_mem_init(void)
 		cz80_bind_memory();
     }
 
-
     if (!cpurom) {
         cpurom = (unsigned char*)malloc(0x10000);
         if (!cpurom) for(;;){}
     }
+
+#ifdef USE_PARITY_TABLE
+    if (!parityVtable) {
+        parityVtable = (unsigned char*)malloc(256);
+        if (!parityVtable) for(;;){}
+    }
+#endif
+
     cpuram = &mainram[0];
 	memset(mainram,0,sizeof(mainram));
     switch(m_emuInfo.machine) {
