@@ -61,10 +61,9 @@ void tlcs_init(void);
 void tlcs_reinit(void);
 /* execute interrupt */
 void tlcs_interrupt_wrapper(int irq);
-#ifdef FRAMESKIP
-void tlcs_execute(int cycles, int skipFrames); /* skipFrames=how many frames to skip for each frame rendered */
-#else
 void tlcs_execute(int cycles);
+#ifdef FRAMESKIP
+void tlcs_queueFrameSkip(int framesToSkip);
 #endif
 
 #ifdef __cplusplus

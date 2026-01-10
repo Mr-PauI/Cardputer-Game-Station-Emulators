@@ -11,6 +11,8 @@
 #include "ngc_input.h"
 #include "ngc_display.h"
 #include "ngc_scheduler.h"
+#include "esp_timer.h" // used for get_time()
+#include "esp_rom_sys.h" // used for esp_rom_delay_us(us)
 // #include "ngc_bios.h"
 
 #define NGP_LANG_EN 1
@@ -123,6 +125,14 @@ static void map_vdp_tables_full()
   rasterY = scanlineY;
 }
 
+static inline void sleep_until_us(int64_t deadline)
+{
+    int64_t now = esp_timer_get_time();
+    if (deadline > now) {
+        esp_rom_delay_us((uint32_t)(deadline - now));
+    }
+}
+
 void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 {
   // Load ROM
@@ -192,16 +202,18 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
   printf("[NGPC_RUN] starting core loop\n");
 
   #ifdef FRAMESKIP
-      const int skipFrames = 1;
+      unsigned int frame_skipped = 0;
   #endif
 
+  unsigned long now = esp_timer_get_time();
   unsigned long status_last = millis();
   unsigned long frames = 0;
   unsigned long frame_time_total = 0;
   unsigned long frame_time_min = ULONG_MAX;
   unsigned long frame_time_max = 0;
   const uint32_t TARGET_US = 16667; // 60 Hz
-  const uint32_t CPU_CLOCK_HZ = 5700000; // 6 MHz downclocked by 5% (smooth perfs)
+  const uint32_t CPU_CLOCK_HZ = 6000000; // 6 MHz downclocked by 5% (smooth perfs)
+  unsigned long next_deadline = now + TARGET_US;
   
   // Kludges ROM
   switch (tlcsMemReadW(0x00200020)) {
@@ -214,34 +226,59 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 
   while (m_bIsActive)
   {
-      uint32_t t0 = micros();  
+      unsigned long t0 = esp_timer_get_time();
+      unsigned long t0ms = micros();  
 
       // Execute one frame
-      #ifdef FRAMESKIP
-              tlcs_execute((CPU_CLOCK_HZ) / 60, skipFrames);
-      #else
-              tlcs_execute((CPU_CLOCK_HZ) / 60);
-      #endif
+      tlcs_execute((CPU_CLOCK_HZ) / 60);
 
-      // Pacing 60 Hz
-      uint32_t emuUs = micros() - t0;
+
+      // Log framerate
+      uint32_t emuUs = micros() - t0ms;
       frame_time_total += emuUs;
       if (emuUs < frame_time_min) frame_time_min = emuUs;
       if (emuUs > frame_time_max) frame_time_max = emuUs;
-
-      int32_t remaining = TARGET_US - emuUs;
-      if (remaining > 0) {
-        delayMicroseconds(remaining);
-      }
-      
-      // Log framerate
       frames++;
+
+      // Pacing 60 Hz
+      now = esp_timer_get_time();
+      // If we're early, wait 
+      if (now < next_deadline) {
+          sleep_until_us(next_deadline);
+          now = next_deadline;
+      }
+
+      if (now > next_deadline + TARGET_US) 
+      {
+        next_deadline = now;
+        #ifdef FRAMESKIP
+        // Queue a skip frame to catch up
+        tlcs_queueFrameSkip(1);
+        frame_skipped++;
+        frames++;
+        #endif
+      }
+      next_deadline += TARGET_US;
+      
+
       if (millis() - status_last >= 2000)
       {
           size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
           float avg_ms = frame_time_total / (float)frames / 1000.0f;
           float min_ms = frame_time_min / 1000.0f;
           float max_ms = frame_time_max / 1000.0f;
+          #ifdef FRAMESKIP
+          printf("[NGP_RUN] %lu[%d] frames / 2s (~%lu FPS) | HEAP: %u bytes (%.1f KB) | AVG %.2fms | MIN %.2fms | MAX %.2fms\n",
+          frames,
+          frame_skipped,
+          frames / 2,
+          (unsigned int)heap_free,
+          heap_free / 1024.0f,
+          avg_ms,
+          min_ms,
+          max_ms);
+          frame_skipped=0;
+          #else
           printf("[NGP_RUN] %lu frames / 2s (~%lu FPS) | HEAP: %u bytes (%.1f KB) | AVG %.2fms | MIN %.2fms | MAX %.2fms\n",
           frames,
           frames / 2,
@@ -250,6 +287,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
           avg_ms,
           min_ms,
           max_ms);
+          #endif
           frame_time_total = 0;
           frame_time_min = ULONG_MAX;
           frame_time_max = 0;

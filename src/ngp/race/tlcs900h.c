@@ -107,7 +107,7 @@ extern uint8_t* s_lut_y_render;
 
 //#define USE_PARITY_TABLE  //this is currently broken!
 #ifdef USE_PARITY_TABLE
-extern unsigned char* parityVtable;            // zero and sign flags table for faster setting
+unsigned char parityVtable[256];            // zero and sign flags table for faster setting
 #endif
 
 // declare all registers
@@ -8321,10 +8321,14 @@ static int tlcs_step(void)
 
 #ifdef FRAMESKIP
 static int s_framesToSkip = 0;  // refreshes every frame
-void tlcs_execute(int cycles, int skipframe )
-#else
-void tlcs_execute(int cycles)
+
+void tlcs_queueFrameSkip(int framesToSkip)
+{
+    s_framesToSkip = framesToSkip;
+}
 #endif
+
+void tlcs_execute(int cycles)
 {
     int elapsed;
     int hCounter = ngOverflow;
@@ -8418,7 +8422,6 @@ void tlcs_execute(int cycles)
 #ifdef NGP_HW_INTERLACED
                     s_interlace_parity = s_framePatternIdx; // <-- set parity for draw, if 152 lines than the parity the same as the last line
 #endif
-                    s_framesToSkip = skipframe;  // set up next skip cycle
                 }
 #else
 #ifdef NGP_HW_INTERLACED
