@@ -212,7 +212,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
   unsigned long frame_time_min = ULONG_MAX;
   unsigned long frame_time_max = 0;
   const uint32_t TARGET_US = 16667; // 60 Hz
-  const uint32_t CPU_CLOCK_HZ = 6000000; // 6 MHz downclocked by 5% (smooth perfs)
+  const uint32_t CPU_CLOCK_HZ = 6000000; // 6 MHz 
   unsigned long next_deadline = now + TARGET_US;
   
   // Kludges ROM
