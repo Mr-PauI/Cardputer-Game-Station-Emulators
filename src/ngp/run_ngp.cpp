@@ -12,6 +12,7 @@
 #include "ngc_display.h"
 #include "ngc_scheduler.h"
 #include "esp_timer.h" // used for get_time()
+#include "../../share/utils.h"
 #include "esp_rom_sys.h" // used for esp_rom_delay_us(us)
 // #include "ngc_bios.h"
 
@@ -125,14 +126,6 @@ static void map_vdp_tables_full()
   rasterY = scanlineY;
 }
 
-static inline void sleep_until_us(int64_t deadline)
-{
-    int64_t now = esp_timer_get_time();
-    if (deadline > now) {
-        esp_rom_delay_us((uint32_t)(deadline - now));
-    }
-}
-
 void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 {
   // Load ROM
@@ -201,10 +194,6 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 
   printf("[NGPC_RUN] starting core loop\n");
 
-  #ifdef FRAMESKIP
-      unsigned int frame_skipped = 0;
-  #endif
-
   unsigned long now = esp_timer_get_time();
   unsigned long status_last = millis();
   unsigned long frames = 0;
@@ -212,9 +201,16 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
   unsigned long frame_time_min = ULONG_MAX;
   unsigned long frame_time_max = 0;
   const uint32_t TARGET_US = 16667; // 60 Hz
-  const uint32_t CPU_CLOCK_HZ = 6000000; // 6 MHz 
+  const uint32_t CPU_CLOCK_HZ = 5700000; // 6 MHz downclocked by 5% (smooth perfs)
   unsigned long next_deadline = now + TARGET_US;
-  
+  uint8_t MAX_LAG_FRAMES = 2; // max number of frames we can lag, prevents overruns after a period of running slow
+  uint32_t MAX_LAG_US = (MAX_LAG_FRAMES * TARGET_US);
+#ifdef FRAMESKIP
+  unsigned int frame_skipped = 0;
+  unsigned int frames_to_render = 0; // how many frames to render before skipping is an possibility  
+#endif
+
+
   // Kludges ROM
   switch (tlcsMemReadW(0x00200020)) {
     case 0x0059:   // Sonic
@@ -242,22 +238,34 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 
       // Pacing 60 Hz
       now = esp_timer_get_time();
+
+      // We fell way behind — drop backlog
+      if (now > next_deadline + MAX_LAG_US)
+        next_deadline -= TARGET_US;
+        //next_deadline = now - TARGET_US;
+
       // If we're early, wait 
       if (now < next_deadline) {
-          sleep_until_us(next_deadline);
+          share::sleep_until_us(next_deadline-200); // throw away a little time to use for the next frame, 200us*60 = 12ms, not even one frame extra a second
           now = next_deadline;
       }
-
-      if (now > next_deadline + TARGET_US) 
+    
+      #ifdef FRAMESKIP
+      if ((now >= (next_deadline + TARGET_US)) && (frames_to_render <= 0))
       {
-        next_deadline = now;
-        #ifdef FRAMESKIP
+        frames_to_render = 4; // This forces a skip frame not to be conisdered again for 5 frames, the first is decremented during this triggered skip frame
         // Queue a skip frame to catch up
         tlcs_queueFrameSkip(1);
         frame_skipped++;
-        frames++;
-        #endif
+        
       }
+      else
+      { // Only advance time if we are not skipping a frame
+        // next_deadline += TARGET_US;
+        if (frames_to_render > 0)
+          frames_to_render--;
+      }
+      #endif
       next_deadline += TARGET_US;
       
 
