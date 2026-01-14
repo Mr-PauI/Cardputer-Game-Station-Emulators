@@ -203,7 +203,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
   const uint32_t TARGET_US = 16667; // 60 Hz
   const uint32_t CPU_CLOCK_HZ = 5700000; // 6 MHz downclocked by 5% (smooth perfs)
   unsigned long next_deadline = now + TARGET_US;
-  uint8_t MAX_LAG_FRAMES = 2; // max number of frames we can lag, prevents overruns after a period of running slow
+  float MAX_LAG_FRAMES = 1.1; // max number of frames we can lag, prevents overruns after a period of running slow
   uint32_t MAX_LAG_US = (MAX_LAG_FRAMES * TARGET_US);
 #ifdef FRAMESKIP
   unsigned int frame_skipped = 0;
@@ -241,8 +241,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 
       // We fell way behind — drop backlog
       if (now > next_deadline + MAX_LAG_US)
-        next_deadline -= TARGET_US;
-        //next_deadline = now - TARGET_US;
+        next_deadline = now - MAX_LAG_US; // clamp to ceiling.
 
       // If we're early, wait 
       if (now < next_deadline) {
