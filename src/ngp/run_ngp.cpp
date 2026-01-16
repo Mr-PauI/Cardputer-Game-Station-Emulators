@@ -126,6 +126,23 @@ static void map_vdp_tables_full()
   rasterY = scanlineY;
 }
 
+
+// Used to compute MADCTL value from rotation and BGR flag
+uint8_t madctl_from_rotation(uint8_t r, bool bgr)
+{
+  static const uint8_t rot_table[4] = {
+    0x00,        // 0°
+    0x60,        // 90°  (MV | MX)
+    0xC0,        // 180° (MX | MY)
+    0xA0         // 270° (MV | MY)
+  };
+
+  uint8_t mad = rot_table[r & 3];
+  if (bgr) mad |= 0x08;
+  return mad;
+}
+
+
 void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 {
   // Load ROM
@@ -195,7 +212,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
   printf("[NGPC_RUN] starting core loop\n");
 
   unsigned long now = esp_timer_get_time();
-  unsigned long status_last = millis();
+  unsigned long status_last = now / 1000;
   unsigned long frames = 0;
   unsigned long frame_time_total = 0;
   unsigned long frame_time_min = ULONG_MAX;
@@ -222,29 +239,30 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
 
   while (m_bIsActive)
   {
-      unsigned long t0 = esp_timer_get_time();
-      unsigned long t0ms = micros();  
+      unsigned long t0 = now; // esp_timer_get_time(); // if set to now we capture all time for logic outside of emulation but also avoid an extra call to esp_timer_get_time()
+      unsigned long t0ms = t0 / 1000ULL;  
 
       // Execute one frame
       tlcs_execute((CPU_CLOCK_HZ) / 60);
 
+      // Pacing 60 Hz
+      now = esp_timer_get_time();
+      unsigned long end =  now / 1000ULL;
 
       // Log framerate
-      uint32_t emuUs = micros() - t0ms;
+      uint32_t emuUs = end - t0ms;
       frame_time_total += emuUs;
       if (emuUs < frame_time_min) frame_time_min = emuUs;
       if (emuUs > frame_time_max) frame_time_max = emuUs;
       frames++;
-
-      // Pacing 60 Hz
-      now = esp_timer_get_time();
 
       // We fell way behind — drop backlog
       if (now > next_deadline + MAX_LAG_US)
         next_deadline = now - MAX_LAG_US; // clamp to ceiling.
 
       // If we're early, wait 
-      if (now < next_deadline) {
+      if (now < (next_deadline - 300)) // 300us margin
+      {
           share::sleep_until_us(next_deadline-200); // throw away a little time to use for the next frame, 200us*60 = 12ms, not even one frame extra a second
           now = next_deadline;
       }
@@ -268,7 +286,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
       next_deadline += TARGET_US;
       
 
-      if (millis() - status_last >= 2000)
+      if (end - status_last >= 2000)
       {
           size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
           float avg_ms = frame_time_total / (float)frames / 1000.0f;
@@ -299,7 +317,7 @@ void run_ngp(const uint8_t* rom_base, size_t rom_size, int machine)
           frame_time_min = ULONG_MAX;
           frame_time_max = 0;
           frames = 0;
-          status_last = millis();
+          status_last = millis(); // this could be set to end to reduce calls to millis() which in turn calls esp_timer_get_time()
       }
   }
 }
