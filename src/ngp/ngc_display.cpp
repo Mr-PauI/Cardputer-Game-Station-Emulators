@@ -178,9 +178,6 @@ static inline void paint_fullscreen_stretch()
   M5.Display.endWrite();
 }
 
-  // To do: This function does not appear to have been updated in a while:
-  // - forced interlacing needs to be replaced with updated s_interlace_parity usage
-  // - color conversion optimization like in paint_fullscreen_stretch(), using line buffer - currently incorrect colours when NGP_USE_THREADED_COLORMAPPING is defined
 static inline IRAM_ATTR void paint_fullheight_4x3()
 {
   const int panelW = 240;
