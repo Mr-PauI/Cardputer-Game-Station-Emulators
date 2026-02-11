@@ -159,8 +159,8 @@ void CardputerView::showKeymapping6ButtonsSnes() {
     keyBox(topRowX + keyW + btnGapX, topRowY,    keyW, keyH, "P");
 
     // Bottom row: B / A
-    keyBox(botRowX,                  bottomRowY, keyW, keyH, "L");
-    keyBox(botRowX + keyW + btnGapX, bottomRowY, keyW, keyH, "J");
+    keyBox(botRowX,                  bottomRowY, keyW, keyH, "K");
+    keyBox(botRowX + keyW + btnGapX, bottomRowY, keyW, keyH, "L");
 
     // START / SELECT 
     const int centerX = Display->width() / 2 - 5;
