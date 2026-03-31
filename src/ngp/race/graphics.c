@@ -27,6 +27,22 @@
 #define BMASK 0x001f
 #endif
 
+typedef struct {
+    unsigned char flip;
+    unsigned char x;
+    unsigned char pal;
+} MYSPRITE;
+
+typedef struct {
+    unsigned short tile;
+    unsigned char  id;
+} MYSPRITEREF;
+
+typedef struct {
+    unsigned char count;
+    MYSPRITEREF   refs[64];
+} MYSPRITELINE;
+
 /* extern fournis ailleurs */
 extern struct ngp_screen* screen;
 extern int gfx_hacks;
@@ -38,8 +54,14 @@ extern volatile unsigned g_frame_ready;
  */
 #define TOTALPALETTE_SIZE  4096
 uint16_t* totalpalette = NULL;
+static unsigned short *myPalettes = NULL;
 static unsigned dark_filter_level = 0;
 extern unsigned short *drawBuffer;
+static MYSPRITELINE *mySprPri40 = NULL;
+static MYSPRITELINE *mySprPri80 = NULL;
+static MYSPRITELINE *mySprPriC0 = NULL;
+static MYSPRITELINE *mySprPriBlock = NULL;
+static MYSPRITE *mySprites = NULL;
 
 /* NGP specific: precalculated pattern structures (nibbles) */
 static const unsigned char mypatterns[256*4] =
@@ -272,33 +294,13 @@ static INLINE void RenderTileCache(TILECACHE *tC, unsigned int bw)
     }
 }
 
-typedef struct {
-    unsigned char flip;
-    unsigned char x;
-    unsigned char pal;
-} MYSPRITE;
-
-typedef struct {
-    unsigned short tile;
-    unsigned char  id;
-} MYSPRITEREF;
-
-typedef struct {
-    unsigned char count;
-    MYSPRITEREF   refs[64];
-} MYSPRITELINE;
-
-static MYSPRITELINE mySprPri40, mySprPri80, mySprPriC0;
-static MYSPRITE *mySprites;
-static unsigned short *myPalettes = NULL;
-
 void sortSprites(unsigned int bw)
 {
     const unsigned char lineY = (unsigned char)(*scanlineY);
 
-    mySprPri40.count = 0;
-    mySprPri80.count = 0;
-    mySprPriC0.count = 0;
+    mySprPri40->count = 0;
+    mySprPri80->count = 0;
+    mySprPriC0->count = 0;
 
     unsigned char prevx = 0, prevy = 0;
 
@@ -338,9 +340,9 @@ void sortSprites(unsigned int bw)
         /* prio */
         MYSPRITELINE *dstList = NULL;
         switch (spriteCode & 0x1800) {
-            case 0x1800: dstList = &mySprPriC0; break;
-            case 0x1000: dstList = &mySprPri80; break;
-            case 0x0800: dstList = &mySprPri40; break;
+            case 0x1800: dstList = mySprPriC0; break;
+            case 0x1000: dstList = mySprPri80; break;
+            case 0x0800: dstList = mySprPri40; break;
             default: continue;
         }
         if (dstList->count >= 64) continue;
@@ -642,7 +644,7 @@ void myGraphicsBlitLine(unsigned char render)
                 sortSprites(is_bw);
 
                 // Ordre empilement
-                drawSprites(draw, mySprPri40.refs, mySprPri40.count, x0, x1);
+                drawSprites(draw, mySprPri40->refs, mySprPri40->count, x0, x1);
 
                 // plans + 0x80 entre les deux
                 const uint8_t frame1 = *frame1Pri;
@@ -652,17 +654,17 @@ void myGraphicsBlitLine(unsigned char render)
                 if (frame1 & 0x80) {
                     // FRONT, SPRITES 0x80, BACK
                     drawScrollPlane(draw, tile_table_front,  64,  sfX, sfY, x0, x1, is_bw);
-                    drawSprites(draw, mySprPri80.refs, mySprPri80.count, x0, x1);
+                    drawSprites(draw, mySprPri80->refs, mySprPri80->count, x0, x1);
                     drawScrollPlane(draw, tile_table_back,   128, sbX, sbY, x0, x1, is_bw);
                 } else {
                     // BACK, SPRITES 0x80, FRONT
                     drawScrollPlane(draw, tile_table_back,   128, sbX, sbY, x0, x1, is_bw);
-                    drawSprites(draw, mySprPri80.refs, mySprPri80.count, x0, x1);
+                    drawSprites(draw, mySprPri80->refs, mySprPri80->count, x0, x1);
                     drawScrollPlane(draw, tile_table_front,  64,  sfX, sfY, x0, x1, is_bw);
                 }
 
                 // sprites prio 0xC0
-                drawSprites(draw, mySprPriC0.refs, mySprPriC0.count, x0, x1);
+                drawSprites(draw, mySprPriC0->refs, mySprPriC0->count, x0, x1);
             }
         }
 
@@ -689,6 +691,15 @@ void myGraphicsBlitLine(unsigned char render)
 
 BOOL graphics_init(void)
 {
+    if (!mySprPriBlock) {
+        mySprPriBlock = calloc(3, sizeof(MYSPRITELINE));
+        if (!mySprPriBlock) return FALSE;
+
+        mySprPri40 = &mySprPriBlock[0];
+        mySprPri80 = &mySprPriBlock[1];
+        mySprPriC0 = &mySprPriBlock[2];
+    }
+
     if (!totalpalette) {
         totalpalette = calloc(TOTALPALETTE_SIZE, sizeof(uint16_t));
     }

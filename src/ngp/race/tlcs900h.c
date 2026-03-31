@@ -7519,7 +7519,7 @@ int decodeF5(void)  //           (xrr+)     dst
 }
 
 // main instruction decode table
-int (*instr_table[256])()=
+int (* const instr_table[256])(void) = 
 {
    nop,  normal,  pushsr,  popsr,  tmax,  halt,  ei,   reti,
    ld8I,  pushI,  ldw8I,  pushwI,  incf,  decf,  ret,  retd,
