@@ -1010,6 +1010,8 @@ int WsRun(void)
 #define NAME_Y (96)
 void WsSplash(void)
 {
+    #ifndef WS_NO_SPLASH_SCREEN
+
     int x, y, i, len, pos, n;
     WORD* p;
     unsigned char* name = (unsigned char*)(IEep + 0x30);
@@ -1150,6 +1152,7 @@ void WsSplash(void)
 	Segment[9] = 0;
     ws_graphics_paint();
 	Sleep(100);
+    #endif
 }
 
 void WsCpyPdata(BYTE* dst)

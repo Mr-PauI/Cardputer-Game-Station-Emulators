@@ -3,8 +3,9 @@ $Date: 2009-10-30 05:26:46 +0100 (ven., 30 oct. 2009) $
 $Rev: 71 $
 */
 
-#ifndef __startup__
-#define __startup__
+#pragma once	
+
+#ifndef WS_NO_SPLASH_SCREEN
 
 static unsigned int size_startup = 0x9200;
 static const unsigned char startup[] = {
