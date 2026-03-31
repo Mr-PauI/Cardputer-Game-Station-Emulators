@@ -19,7 +19,10 @@ typedef struct
 	int Output[4];
 }t_SN76496;
 
-extern t_SN76496 sn[MAX_76496];
+extern t_SN76496 *sn;
+
+int SN76496_alloc(void);
+void SN76496_free(void);
 
 void SN76496Write(int chip,int data);
 void SN76496Update(int chip, signed short int *buffer[2],int length,unsigned char mask);

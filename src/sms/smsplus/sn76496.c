@@ -7,7 +7,7 @@
 #define FB_PNOISE   0x08000
 #define NG_PRESET   0x0F35
 
-t_SN76496 sn[MAX_76496];
+t_SN76496 *sn = NULL;
 
 void SN76496Write(int chip,int data)
 {
@@ -211,10 +211,27 @@ void SN76496_set_gain(int chip,int gain)
 	R->VolTable[15] = 0;
 }
 
+int SN76496_alloc(void)
+{
+    if (sn)
+        return 1;
 
+    sn = (t_SN76496 *)calloc(MAX_76496, sizeof(t_SN76496));
+    return (sn != NULL);
+}
+
+void SN76496_free(void)
+{
+    free(sn);
+    sn = NULL;
+}
 
 int SN76496_init(int chip,int clock,int volume,int sample_rate)
 {
+	if (!SN76496_alloc())
+	{
+		return 0; /* ou false selon ton code */
+	}
 	int i;
     t_SN76496 *R = &sn[chip];
 
