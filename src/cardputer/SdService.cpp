@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "SdService.h"
 
 SdService::SdService() {}

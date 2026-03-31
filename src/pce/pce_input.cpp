@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "pce_input.h"
 
 #include <M5Cardputer.h>

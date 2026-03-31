@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #ifndef CARDPUTER_VIEW_H
 #define CARDPUTER_VIEW_H
 
@@ -23,6 +25,7 @@
 #define GAMEGEAR_COLOR 0xC29F  // Violet/magenta  (≈ #C050FF)
 #define NEOGEO_COLOR   0x05E8 // Vert (≈ #2a9333ff)
 #define WS_COLOR       0x07FF  // Cyan (≈ #00FFFF)
+#define ATARI_COLOR    0x2574  // Cyan sombre 
 #define PCE_COLOR      0xE81A
 #define LYNX_COLOR     0xD588  
 #define GAMEBOY_COLOR  0xFCD3

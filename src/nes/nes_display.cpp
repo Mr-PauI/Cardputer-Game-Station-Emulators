@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 extern "C" {
 #include <nes/nes.h>
 }

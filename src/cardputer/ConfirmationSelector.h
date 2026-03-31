@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #ifndef CONFIRMATION_SELECTOR_H
 #define CONFIRMATION_SELECTOR_H
 

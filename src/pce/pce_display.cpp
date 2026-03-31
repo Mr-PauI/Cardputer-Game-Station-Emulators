@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "pce_display.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>

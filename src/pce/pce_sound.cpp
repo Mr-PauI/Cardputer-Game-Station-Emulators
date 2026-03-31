@@ -1,3 +1,6 @@
+
+#pragma GCC optimize ("Os")
+
 #include "pce_sound.h"
 #include <M5Cardputer.h>
 #include "esp_heap_caps.h"

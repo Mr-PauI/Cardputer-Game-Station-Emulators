@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "VerticalSelector.h"
 #include <algorithm>
 #include <cctype>

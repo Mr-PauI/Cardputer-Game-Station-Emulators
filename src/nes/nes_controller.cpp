@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include <M5Cardputer.h>
 #include "share/input.h"
 

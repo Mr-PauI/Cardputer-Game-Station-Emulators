@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #ifndef SD_SERVICE_H
 #define SD_SERVICE_H
 
