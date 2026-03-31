@@ -19,6 +19,8 @@
 #include "genesis/run_genesis.h"
 #include "gbc/run_gbc.h"
 #include "snes/run_snes.h"
+#include "atari7800/run_a7800.h"
+#include "atari2600/run_a2600.h"
 #include "last_game.h"
 #define RETRO_COMPAT_IMPLEMENTATION
 #include "ngp/race/retro_compat.h"
@@ -41,7 +43,6 @@ void setup() {
   auto cfg = M5.config();
   cfg.output_power = true;
   M5Cardputer.begin(cfg);
-
   CardputerInput input;
   SdService sd;
   CardputerView display;
@@ -74,7 +75,6 @@ void setup() {
       romPath = "/sd" + romPath; // ensure sd prefix
     }
   }
-
   printf("Selected ROM: %s\n", romPath.c_str());
 
   display.topBar("COPYING ROM TO FLASH", false, false);
@@ -112,8 +112,7 @@ void setup() {
         }
       }
     }
-    
-    // Rom limit is reached (either launcher default 1MB/4.5MB or normal 6MB)
+    // Rom limit is reached (either launcher default 1MB/4MB or normal 5.5MB)
     while (1) {
         display.topBar("ROM IS TOO HEAVY", false, false);
         display.subMessage("Copy ROM to flash failed", 1500);
@@ -132,10 +131,8 @@ void setup() {
       delay(1500);
     }
   }
-
   // Register the XIP VFS
   vfs_xip_register();
-
   // Check the extension to choose the emulator
   auto ext = getRomType(romPath);
 
@@ -177,11 +174,13 @@ void setup() {
   auto pos = romPath.find_last_of("/\\");
   std::string romName = (pos == std::string::npos) ? romPath : romPath.substr(pos + 1);
 
-  printf("HEAP BEFORE EMU: %u bytes\n", esp_get_free_heap_size());
-
   // Initialize I2C M5Stack JoyV2 if any
   share::detectI2cPad();
+  printf("12 after detectI2cPad: %u\n", esp_get_free_heap_size());
   
+  printf("HEAP BEFORE EMU: %u bytes\n", esp_get_free_heap_size());
+  printf("MAX BLOCK BEFORE EMU: %u bytes\n", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+
   // Run the emulator
   if (ext == ROM_TYPE_NES) {
       // --- NES ---
@@ -200,7 +199,7 @@ void setup() {
   }
   else if (ext == ROM_TYPE_GENESIS) {
       // --- Megadrive / Genesis ---
-      run_genesis(get_rom_ptr(), get_rom_size());
+      run_genesis(get_rom_ptr(), get_rom_size(), romName.c_str());
   }
   else if (ext == ROM_TYPE_WS) {
       // --- WonderSwan / Color ---
@@ -223,6 +222,14 @@ void setup() {
       display.displaySnesInfo();
       input.waitPress();
       run_snes(get_rom_ptr(), get_rom_size());
+  }
+  else if (ext == ROM_TYPE_ATARI7800) {
+      // --- Atari 7800 ---
+      run_a7800(get_rom_ptr(), get_rom_size(), romName.c_str());
+  }
+  else if (ext == ROM_TYPE_ATARI2600) {
+      // --- Atari 2600 ---
+      run_a2600(get_rom_ptr(), get_rom_size(), romName.c_str());
   }
   else {
       display.topBar("ERROR", false, false);
