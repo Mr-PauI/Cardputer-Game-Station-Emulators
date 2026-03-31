@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "ConfirmationSelector.h"
 
 ConfirmationSelector::ConfirmationSelector(CardputerView& display, CardputerInput& input)

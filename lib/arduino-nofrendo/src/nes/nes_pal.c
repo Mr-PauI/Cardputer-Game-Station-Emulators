@@ -33,7 +33,7 @@
 #endif
 
 /* my NES palette, converted to RGB */
-rgb_t shady_palette[] =
+const rgb_t shady_palette[] =
     {
         {0x80, 0x80, 0x80}, {0x00, 0x00, 0xBB}, {0x37, 0x00, 0xBF}, {0x84, 0x00, 0xA6}, {0xBB, 0x00, 0x6A}, {0xB7, 0x00, 0x1E}, {0xB3, 0x00, 0x00}, {0x91, 0x26, 0x00}, {0x7B, 0x2B, 0x00}, {0x00, 0x3E, 0x00}, {0x00, 0x48, 0x0D}, {0x00, 0x3C, 0x22}, {0x00, 0x2F, 0x66}, {0x00, 0x00, 0x00}, {0x05, 0x05, 0x05}, {0x05, 0x05, 0x05},
 
@@ -93,7 +93,7 @@ rgb_t shady_palette[] =
 */
 
 /* our global palette */
-rgb_t nes_palette[64];
+rgb_t *nes_palette = NULL;
 
 static float hue = 334.0f;
 static float tint = 0.4f;
@@ -135,12 +135,27 @@ static const float brightness[4][4] =
 static const int col_angles[16] =
     {
         0, 240, 210, 180, 150, 120, 90, 60, 30, 0, 330, 300, 270, 0, 0, 0};
+        
+static int pal_ensure_allocated(void)
+{
+   if (!nes_palette)
+   {
+      nes_palette = (rgb_t*)malloc(sizeof(rgb_t) * 64);
+      if (!nes_palette)
+         return 0;
+   }
+
+   return 1;
+}
 
 void pal_generate(void)
 {
    int x, z;
    float s, y, theta;
    int r, g, b;
+
+   if (!pal_ensure_allocated())
+      return;
 
    for (x = 0; x < 4; x++)
    {
@@ -149,28 +164,24 @@ void pal_generate(void)
          switch (z)
          {
          case 0:
-            /* is color $x0?  If so, get luma */
             s = 0;
             y = brightness[0][x];
             break;
 
          case 13:
-            /* is color $xD?  If so, get luma */
             s = 0;
             y = brightness[2][x];
             break;
 
          case 14:
          case 15:
-            /* is color $xE/F?  If so, set to black */
             s = 0;
             y = brightness[3][x];
-
             break;
 
          default:
-            s = tint;             /* grab tint */
-            y = brightness[1][x]; /* grab default luminance */
+            s = tint;
+            y = brightness[1][x];
             break;
          }
 

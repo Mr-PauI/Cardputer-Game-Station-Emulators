@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "rom_flash_io.h"
 
 #include <stdio.h>

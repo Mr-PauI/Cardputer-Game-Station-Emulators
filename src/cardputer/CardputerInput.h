@@ -1,7 +1,6 @@
 #ifndef CARDPUTER_INPUT_H
 #define CARDPUTER_INPUT_H
 
-#include <map>
 #include <M5Cardputer.h>
 
 #define KEY_OK '\n'

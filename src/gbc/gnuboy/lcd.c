@@ -23,7 +23,7 @@ typedef struct
 #define VBANKS GB.vbanks
 #define CYCLES GB.cycles
 
-static byte BUF[0x100];
+static byte *BUF = NULL;
 static int WX, WY;
 static bool pal_dirty;
 
@@ -451,6 +451,7 @@ static inline void spr_scan(gb_vs_t *VS, int ns, byte *PRI)
 
 void gb_lcd_init(void)
 {
+	if (!BUF) BUF = (byte*)calloc(0x100, sizeof(byte));
 	return;
 }
 

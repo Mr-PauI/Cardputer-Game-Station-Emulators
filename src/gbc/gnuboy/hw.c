@@ -208,23 +208,28 @@ void gb_hw_setpad(int new_pad)
 
 bool gb_hw_init(void)
 {
-	hw.rambanks = calloc(8, 4096);
-	hw.vbanks = calloc(2, 8192);
-	hw.ioregs = calloc(256, 1);
-	hw.video.palette = malloc(64 * sizeof(uint16_t));
+    hw.rambanks = calloc(8, 4096);
+    hw.vbanks   = calloc(2, 8192);
+    hw.ioregs   = calloc(256, 1);
 
-	hw.snd = gb_sound_init();
-	hw.cpu = gb_cpu_init();
-	hw.cart = &cart;
-	gb_lcd_init();
+    // hw.oam  = calloc(256, 1);
+    // hw.pal  = calloc(128, 1);
 
-	if (!hw.rambanks || !hw.vbanks || !hw.cpu || !hw.snd)
-	{
-		// hw_deinit();
-		return false;
-	}
+    hw.video.palette = malloc(64 * sizeof(uint16_t));
 
-	return true;
+    hw.snd = gb_sound_init();
+    hw.cpu = gb_cpu_init();
+    hw.cart = &cart;
+    gb_lcd_init();
+
+    if (!hw.rambanks || !hw.vbanks || !hw.ioregs ||
+        !hw.oam || !hw.pal || !hw.rmap || !hw.wmap ||
+        !hw.video.palette || !hw.cpu || !hw.snd)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 

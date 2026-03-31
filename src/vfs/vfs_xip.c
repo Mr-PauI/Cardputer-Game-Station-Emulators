@@ -1,3 +1,6 @@
+
+#pragma GCC optimize ("Os")
+
 #include <string.h>
 #include <stdio.h>
 #include <sys/errno.h>

@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "CardputerView.h"
 #include "Welcome.h"
 #include "CardputerInput.h"
@@ -175,7 +177,7 @@ void CardputerView::welcome() {
     Display->pushImage(0, 0, BGGAMESTATION_S_WIDTH, BGGAMESTATION_S_HEIGHT, bggamestation_s);
    
     // Title
-    std::string title = "Game Station 1.0";
+    std::string title = "Game Station 1.1";
     Display->setTextColor(TEXT_COLOR);
     Display->setTextSize(TEXT_BIG);
     Display->setCursor(getCenterOffset(title), 65);
@@ -186,7 +188,7 @@ void CardputerView::welcome() {
 
 void CardputerView::topBar(const std::string& title, bool submenu, bool searchBar) {
     uint8_t marginX = 4;
-    uint8_t marginY = 14;
+    uint8_t marginY = 17;
     int offsetX; // for text align
     size_t limiter; // char limitation
     float sizeText; // pixels offset depending on text size
@@ -952,6 +954,9 @@ uint16_t CardputerView::colorForExt(const std::string& extRaw) const {
     if (ext == ".gb" || ext == ".gbc") return GAMEBOY_COLOR;
     if (ext == ".lnx") return LYNX_COLOR;
     if (ext == ".sfc" || ext == ".smc") return SNES_COLOR;
+    if (ext == ".a78") return ATARI_COLOR;
+    if (ext == ".a26") return ATARI_COLOR;
+    if (ext == ".a26/78") return ATARI_COLOR;
 
     return TEXT_COLOR;
 }

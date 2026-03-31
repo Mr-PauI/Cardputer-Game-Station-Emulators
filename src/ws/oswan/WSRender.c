@@ -29,7 +29,7 @@ BYTE *SprTTMap;
 BYTE *SprETMap;
 BYTE* SprTMap = NULL;
 WORD* FrameBuffer = NULL;
-WORD Palette[16][16];
+WORD (*Palette)[16] = NULL;
 WORD MonoColor[8];
 int Layer[3] = {1, 1, 1};
 int Segment[11];
@@ -39,6 +39,8 @@ int Segment[11];
 #endif
 
 void AllocateBuffers(void) {
+    Palette = (WORD (*)[16])calloc(16, sizeof(*Palette));
+
     // SprTMap : 512 bytes
     SprTMap = (BYTE*)malloc(512 * sizeof(BYTE));
     memset(SprTMap, 0, 512 * sizeof(BYTE));

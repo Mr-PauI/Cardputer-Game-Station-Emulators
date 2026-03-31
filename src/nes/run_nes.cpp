@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "run_nes.h"
 
 #include <M5Cardputer.h>

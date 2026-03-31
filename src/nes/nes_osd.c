@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>

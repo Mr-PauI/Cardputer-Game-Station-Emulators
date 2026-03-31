@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #pragma once
 
 #include <string>

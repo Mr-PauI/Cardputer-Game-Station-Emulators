@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #ifndef VERTICAL_SELECTOR_H
 #define VERTICAL_SELECTOR_H
 

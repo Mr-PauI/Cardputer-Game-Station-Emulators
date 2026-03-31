@@ -5,7 +5,10 @@
 #include "WSHard.h"
 #include "WS.h"
 #include "WSApu.h"
+
 #include "startup.h"
+
+    #define WS_NO_SPLASH
 #include <esp_attr.h>
 
 // -----------------------------------------------------------------------------

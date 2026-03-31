@@ -159,7 +159,7 @@ enum
 };
 
 /* TODO: roll options into a structure */
-static message_t msg;
+static message_t *msg = NULL;
 static bool option_showfps = false;
 static bool option_showgui = false;
 static int option_wavetype = GUI_WAVENONE;
@@ -368,11 +368,11 @@ static void gui_tickdec(void)
 #endif /* NOFRENDO_DEBUG */
 
    /* TODO: bleh */
-   if (msg.ttl > 0)
+   if (msg->ttl > 0)
    {
-      msg.ttl -= ticks;
-      if (msg.ttl < 0)
-         msg.ttl = 0;
+      msg->ttl -= ticks;
+      if (msg->ttl < 0)
+         msg->ttl = 0;
    }
 }
 
@@ -437,8 +437,8 @@ void gui_incpatterncol(void)
 /* Downward-scrolling message display */
 static void gui_updatemsg(void)
 {
-   if (msg.ttl)
-      gui_textbar(msg.text, 2, gui_surface->height - 10, &small, msg.color, GUI_DKGRAY, BUTTON_UP);
+   if (msg->ttl)
+      gui_textbar(msg->text, 2, gui_surface->height - 10, &small, msg->color, GUI_DKGRAY, BUTTON_UP);
 }
 
 /* Little thing to display the waveform */
@@ -572,7 +572,7 @@ void gui_frame(bool draw)
    if (option_showoam)
       gui_updateoam();
 
-   if (msg.ttl)
+   if (msg->ttl)
       gui_updatemsg();
 
    if (option_showgui)
@@ -586,18 +586,18 @@ void gui_sendmsg(int color, char *format, ...)
 {
    va_list arg;
    va_start(arg, format);
-   vsprintf(msg.text, format, arg);
+   vsprintf(msg->text, format, arg);
 
 #ifdef NOFRENDO_DEBUG
    nofrendo_log_print("GUI: ");
-   nofrendo_log_print(msg.text);
+   nofrendo_log_print(msg->text);
    nofrendo_log_print("\n");
 #endif /* NOFRENDO_DEBUG */
 
    va_end(arg);
 
-   msg.ttl = gui_refresh * 2; /* 2 second delay */
-   msg.color = color;
+   msg->ttl = gui_refresh * 2; /* 2 second delay */
+   msg->color = color;
 }
 
 void gui_setrefresh(int frequency)
@@ -608,13 +608,20 @@ void gui_setrefresh(int frequency)
 int gui_init(void)
 {
    gui_refresh = 60;
-   memset(&msg, 0, sizeof(message_t));
 
-   return 0; /* can't fail */
+   if (!msg) {
+      msg = (message_t*)calloc(1, sizeof(message_t));
+      if (!msg)
+         return -1;
+   }
+
+   return 0;
 }
 
 void gui_shutdown(void)
 {
+   free(msg);
+   msg = NULL;
 }
 
 /*

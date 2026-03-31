@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "save.h"
 #include <stdio.h>
 #include <string.h>

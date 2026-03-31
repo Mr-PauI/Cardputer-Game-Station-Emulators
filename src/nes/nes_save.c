@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 // src/nes/nes_save.c
 #include <stdio.h>
 #include <string.h>
@@ -19,7 +21,7 @@ static TickType_t g_next_check = 0;
 static TickType_t g_dirty_deadline = 0;
 static TickType_t g_next_allowed_write = 0;
 
-static char       g_rompath_for_saves[PATH_MAX] = {0};
+static char *g_rompath_for_saves = NULL;
 
 #define SRAM_CHECK_PERIOD_MS   250   /* Check period */
 #define SRAM_DEBOUNCE_MS       500  /* Wait after last change */
@@ -62,7 +64,10 @@ static void make_save_path(char *dst, size_t dstlen)
     ensure_saves_dir();
 
     /* source */
-    const char *src = g_rompath_for_saves[0] ? g_rompath_for_saves : "/xip/rom.nes";
+    const char *src = (g_rompath_for_saves && g_rompath_for_saves[0])
+    ? g_rompath_for_saves
+    : "/xip/rom.nes";
+
     strncpy(tmp, src, sizeof(tmp)-1);
     tmp[sizeof(tmp)-1] = '\0';
 
@@ -135,9 +140,15 @@ void osd_set_sram_ptr(uint8_t *ptr, size_t len)
 /* called by nes_osd.c (osd_main) to remember argv[0] for naming the save */
 void osd_set_rompath_for_saves(const char *p)
 {
+    if (!g_rompath_for_saves) {
+        g_rompath_for_saves = (char*)calloc(PATH_MAX, 1);
+        if (!g_rompath_for_saves)
+            return;
+    }
+
     if (!p) p = "/xip/rom.nes";
-    strncpy(g_rompath_for_saves, p, sizeof(g_rompath_for_saves)-1);
-    g_rompath_for_saves[sizeof(g_rompath_for_saves)-1] = '\0';
+    strncpy(g_rompath_for_saves, p, PATH_MAX - 1);
+    g_rompath_for_saves[PATH_MAX - 1] = '\0';
 }
 
 /* called by custom_blit to trigger autosave */
@@ -216,7 +227,7 @@ static void build_sd_save_path_from_xip(char *dst, size_t dstlen, const char *xi
 char *osd_newextension(char *string, char *ext)
 {
     if (path_is_xip_mount(string)) {
-        static char buf[PATH_MAX];
+        char buf[PATH_MAX];
         ensure_saves_dir();
         build_sd_save_path_from_xip(buf, sizeof(buf), string, ext);
         strncpy(string, buf, PATH_MAX - 1);

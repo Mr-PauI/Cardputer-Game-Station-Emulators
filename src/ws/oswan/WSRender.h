@@ -15,7 +15,7 @@ extern BYTE *Scr2TMap;
 extern BYTE *SprTTMap;
 extern BYTE *SprETMap;
 extern BYTE *SprTMap;
-extern WORD Palette[16][16];
+extern WORD (*Palette)[16];
 extern WORD MonoColor[8];
 extern WORD *FrameBuffer;
 // extern WORD SegmentBuffer[(144 * 4) * (8 * 4)];

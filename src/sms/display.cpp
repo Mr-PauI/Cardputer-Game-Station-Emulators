@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "display.h"
 #include <M5Cardputer.h>
 #include <M5Unified.h>

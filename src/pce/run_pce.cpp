@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 extern "C" {
   #include "pce-go/pce.h"
   #include "pce-go/psg.h"

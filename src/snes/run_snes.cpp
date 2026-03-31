@@ -13,23 +13,27 @@ extern "C" {
 }
 
 /* Globals */
-static uint32_t g_dstY = 0;
+static uint32_t g_dstY1 = 0;
+static uint32_t g_dstY2 = 0;
+static bool     g_hasSecond = false;
+
 bool interlace_enabled = false;
-uint32_t fieldParity = 0; 
 
 /* Callback video line render Snes9x */
 static void S9XLineRender(uint32_t y,
                           const uint16_t* pixels,
                           uint32_t width)
 {
-    snes_display_submit_line(g_dstY, pixels, width);
+    (void)y;
+    snes_display_submit_line_ex(g_dstY1, g_dstY2, g_hasSecond, pixels, width);
 }
 
 /* Hook controls Snes9x */
 uint32_t S9xReadJoypad(int32_t port)
 {
-    if (port != 0)
+    if (port != 0) {
         return 0;
+    }
 
     return snes_input_poll();
 }
@@ -59,7 +63,6 @@ bool S9xInitDisplay(void)
 
 bool snes_init()
 {
-    // Order important
     if (!S9xInitDisplay()) {
         printf("[SNES] S9xInitDisplay failed\n");
         return false;
@@ -117,7 +120,7 @@ void run_snes(const uint8_t* rom, size_t romSize)
     Settings.H_Max            = SNES_CYCLES_PER_SCANLINE;
     Settings.FrameTimePAL     = 20000;
     Settings.FrameTimeNTSC    = 16667;
-    Settings.ControllerOption= SNES_JOYPAD;
+    Settings.ControllerOption = SNES_JOYPAD;
     Settings.HBlankStart      = (256 * Settings.H_Max) / SNES_HCOUNTER_MAX;
 
     // Audio OFF (not enough RAM)
@@ -126,7 +129,7 @@ void run_snes(const uint8_t* rom, size_t romSize)
     Settings.ThreadSound       = false;
     Settings.Mute              = true;
     Settings.APUEnabled        = false;
-    Settings.DisableSoundEcho = false;
+    Settings.DisableSoundEcho  = false;
 
     if (!snes_init()) {
         printf("[SNES] snes_init failed, aborting\n");
@@ -151,11 +154,6 @@ void run_snes(const uint8_t* rom, size_t romSize)
     const uint32_t budget55_us = 1000000u / 55u;
     bool skipped_last_render = false;
     uint32_t last_frame_exec_us = 0;
-
-    // Scaling variables
-    const float scale = (float)PPU.ScreenHeight / (float)LCD_H;
-    const float srcStart = 0.5f * (PPU.ScreenHeight - LCD_H * scale);
-    float srcYf = srcStart;
     int32_t srcY = 0;
 
     // Init display and input
@@ -172,43 +170,76 @@ void run_snes(const uint8_t* rom, size_t romSize)
         // Decide to skip frame render or not
         bool want_skip = (last_frame_exec_us > budget55_us);
         bool do_render = true;
+
         if (want_skip && !skipped_last_render) {
             do_render = false;
         }
+
         IPPU.RenderThisFrame = do_render;
 
         // Run one frame
         int64_t frame_start_us = esp_timer_get_time();
         S9xMainLoop();
 
-        // Render frame (interlace or full)
+        // Render frame
         if (IPPU.RenderThisFrame) {
+            snes_display_update_transform(SNES_WIDTH, PPU.ScreenHeight);
 
-            const uint32_t startY = interlace_enabled ? fieldParity : 0;
-            const uint32_t stepY  = interlace_enabled ? 2 : 1;
+            SnesDisplayTransform tr;
+            snes_display_get_transform(&tr);
 
-            for (uint32_t dstY = startY; dstY < LCD_H; dstY += stepY) {
-                srcYf = srcStart + (dstY + 0.5f) * scale;
-                srcY = (int32_t)srcYf;
-
-                if (srcY < 0) srcY = 0;
-                if (srcY >= (int32_t)PPU.ScreenHeight)
-                    srcY = PPU.ScreenHeight - 1;
-
-                g_dstY = dstY;
-                S9xRenderLine_NoFramebuffer(
-                    (uint32_t)srcY, S9XLineRender);
-            }
+            const float srcCY = ((float)PPU.ScreenHeight - 1.0f) * 0.5f;
+            const float dstCY = ((float)tr.dstH - 1.0f) * 0.5f;
 
             if (interlace_enabled) {
-                fieldParity ^= 1;
+                // rendering two lines in one go, to gain some FPS, at the cost of vertical resolution 
+                for (int pairY = 0; pairY < tr.dstH; pairY += 2) {
+                    float srcYf = srcCY + ((float)pairY - dstCY) * tr.invScaleY;
+                    srcY = (int32_t)srcYf;
+
+                    if (srcY < 0) {
+                        srcY = 0;
+                    }
+                    if (srcY >= (int32_t)PPU.ScreenHeight) {
+                        srcY = (int32_t)PPU.ScreenHeight - 1;
+                    }
+
+                    g_dstY1 = (uint32_t)(tr.yOffset + pairY);
+                    g_dstY2 = (pairY + 1 < tr.dstH)
+                        ? (uint32_t)(tr.yOffset + pairY + 1)
+                        : g_dstY1;
+                    g_hasSecond = (g_dstY2 != g_dstY1);
+
+                    S9xRenderLine_NoFramebuffer((uint32_t)srcY, S9XLineRender);
+                }
+
+                // wait for the small display buffers to be emptied
+                // before moving to the next frame
+                snes_display_wait_idle();
+            } else {
+                for (int dstY = 0; dstY < tr.dstH; ++dstY) {
+                    float srcYf = srcCY + ((float)dstY - dstCY) * tr.invScaleY;
+                    srcY = (int32_t)srcYf;
+
+                    if (srcY < 0) {
+                        srcY = 0;
+                    }
+                    if (srcY >= (int32_t)PPU.ScreenHeight) {
+                        srcY = (int32_t)PPU.ScreenHeight - 1;
+                    }
+
+                    g_dstY1 = (uint32_t)(tr.yOffset + dstY);
+                    g_dstY2 = 0;
+                    g_hasSecond = false;
+
+                    S9xRenderLine_NoFramebuffer((uint32_t)srcY, S9XLineRender);
+                }
             }
         }
 
         // Frame end
         int64_t frame_end_us = esp_timer_get_time();
-        last_frame_exec_us =
-            (uint32_t)(frame_end_us - frame_start_us);
+        last_frame_exec_us = (uint32_t)(frame_end_us - frame_start_us);
 
         skipped_last_render = !IPPU.RenderThisFrame;
 
@@ -216,19 +247,20 @@ void run_snes(const uint8_t* rom, size_t romSize)
         frameCount++;
         uint32_t nowMs = millis();
         if (nowMs - lastFpsMs >= 1000) {
-            float fps =
-                (frameCount * 1000.0f) / (nowMs - lastFpsMs);
-            
-            // Auto interlace toggle
-            if (!interlace_enabled && fps < 48.0f)
-                interlace_enabled = true;
-            else if (interlace_enabled && fps > 60.0f)
-                interlace_enabled = false;
+            float fps = (frameCount * 1000.0f) / (nowMs - lastFpsMs);
 
-            printf("[SNES] FPS: %.2f | HEAP: %u | INTERLACE: %s\n",
+            // Auto interlace toggle
+            if (!interlace_enabled && fps < 48.0f) {
+                interlace_enabled = true;
+            } else if (interlace_enabled && fps > 60.0f) {
+                interlace_enabled = false;
+            }
+
+            printf("[SNES] FPS: %.2f | HEAP: %u | INTERLACE: %s | ZOOM: %d%%\n",
                    fps,
                    esp_get_free_heap_size(),
-                   interlace_enabled ? "ON" : "OFF");
+                   interlace_enabled ? "ON" : "OFF",
+                   snesZoomPercent);
 
             frameCount = 0;
             lastFpsMs  = nowMs;
