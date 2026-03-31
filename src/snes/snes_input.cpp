@@ -12,6 +12,8 @@ extern "C" {
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+extern int snesZoomPercent;
+
 static volatile uint32_t s_lastInputMask = 0; 
 
 #ifndef SNES_NO_THREADED_INPUT
@@ -40,6 +42,27 @@ uint32_t snes_input_compute_mask()
 
     // vol, bright, quit, etc.
     share::checkCommonInput(ks);
+
+    // ================== ZOOM ==================
+
+    if (M5Cardputer.Keyboard.isChange() &&
+        M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_SCREEN_TOGGLE)) {
+        snesZoomPercent += 10;
+        if (snesZoomPercent > 150) {
+            snesZoomPercent = 100;
+        }
+        return s_lastInputMask;
+    }
+
+    if (ks.fn && M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_ZOOM_PLUS)) {
+        snesZoomPercent = (snesZoomPercent < 150) ? (snesZoomPercent + 1) : 150;
+        return s_lastInputMask;
+    }
+
+    if (ks.fn && M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_ZOOM_MINUS)) {
+        snesZoomPercent = (snesZoomPercent > 100) ? (snesZoomPercent - 1) : 100;
+        return s_lastInputMask;
+    }
 
     // ================== I2C PAD (M5Stack JoyV2) ==================
     if (share::hasI2cPad()) {
@@ -200,6 +223,27 @@ uint32_t snes_input_poll()
 
     // vol, bright, quit, etc.
     share::checkCommonInput(ks);
+
+    // ================== ZOOM ==================
+
+    if (M5Cardputer.Keyboard.isChange() &&
+        M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_SCREEN_TOGGLE)) {
+        snesZoomPercent += 10;
+        if (snesZoomPercent > 150) {
+            snesZoomPercent = 100;
+        }
+        return s_lastInputMask;
+    }
+
+    if (ks.fn && M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_ZOOM_PLUS)) {
+        snesZoomPercent = (snesZoomPercent < 150) ? (snesZoomPercent + 1) : 150;
+        return s_lastInputMask;
+    }
+
+    if (ks.fn && M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_ZOOM_MINUS)) {
+        snesZoomPercent = (snesZoomPercent > 100) ? (snesZoomPercent - 1) : 100;
+        return s_lastInputMask;
+    }
 
     // // ================== I2C PAD (M5Stack JoyV2) ==================
     if (share::hasI2cPad()) {
