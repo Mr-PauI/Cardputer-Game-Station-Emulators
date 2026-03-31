@@ -32,6 +32,12 @@ __license__ = "GPLv3"
 #include "gwenesis_sn76489.h"
 #include "gwenesis_savestate.h"
 
+uint8_t *SRAM = NULL;
+uint8_t SRAM_ENABLED = 0;
+uint32_t SRAM_START = 0;
+uint32_t SRAM_END = 0;
+uint32_t SRAM_SIZE = 0;
+
 #if GNW_TARGET_MARIO !=0 || GNW_TARGET_ZELDA!=0
   #pragma GCC optimize("Ofast")
 #endif
@@ -726,4 +732,51 @@ void gwenesis_bus_load_state() {
     saveGwenesisStateGetBuffer(state, "TMSS", TMSS, sizeof(TMSS));
     tmss_state = saveGwenesisStateGet(state, "tmss_state");
     tmss_count = saveGwenesisStateGet(state, "tmss_count");
+}
+
+void gwenesis_init_sram(uint8_t *rom, uint32_t rom_size) {
+  SRAM_ENABLED = 0;
+  SRAM_START = 0;
+  SRAM_END = 0;
+  SRAM_SIZE = 0;
+
+  if (SRAM != NULL) {
+    free(SRAM);
+    SRAM = NULL;
+  }
+
+  if (rom == NULL || rom_size < 0x1BC) {
+    return;
+  }
+
+  if (rom[0x1B0] != 'R' || rom[0x1B1] != 'A') {
+    return;
+  }
+
+  uint32_t start = be32_read(&rom[0x1B4]);
+  uint32_t end   = be32_read(&rom[0x1B8]);
+
+  if (end < start) {
+    return;
+  }
+
+  uint32_t size = (end - start) + 1;
+
+  if (size == 0 || size > 0x4000) {
+    return;
+  }
+
+  SRAM = (uint8_t*)calloc(1, size);
+  if (SRAM == NULL) {
+    printf("SRAM alloc failed: %u\n", (unsigned)size);
+    return;
+  }
+
+  SRAM_START = start;
+  SRAM_END = end;
+  SRAM_SIZE = size;
+  SRAM_ENABLED = 1;
+
+  printf("SRAM detected: start=%08X end=%08X size=%u\n",
+         (unsigned)start, (unsigned)end, (unsigned)size);
 }

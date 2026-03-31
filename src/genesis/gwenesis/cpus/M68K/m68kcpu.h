@@ -14,7 +14,14 @@
 #endif /* M68K_EMULATE_ADDRESS_ERROR */
 
 #include "m68k.h"
-
+#include "gwenesis_bus.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+void genesis_save_mark_dirty_c(void);
+#ifdef __cplusplus
+}
+#endif
 /* ======================================================================== */
 /* ============================ GENERAL DEFINES =========================== */
 /* ======================================================================== */
@@ -858,13 +865,19 @@ INLINE uint m68ki_read_imm_32(void)
 
 INLINE uint m68ki_read_8(uint address)
 {
-
   m68ki_set_fc(FLAG_S | m68ki_get_address_space()) /* auto-disable (see m68kcpu.h) */
 
-	if (ADDRESS_68K(address) <  0x800000) return FETCH8ROM(ADDRESS_68K(address));
-	if (ADDRESS_68K(address) >= 0xFF0000) return FETCH8RAM(ADDRESS_68K(address));
-	return m68k_read_memory_8(ADDRESS_68K(address));
+  uint32_t a = ADDRESS_68K(address);
 
+  if (SRAM_ENABLED && SRAM != NULL && a >= SRAM_START && a <= SRAM_END) {
+    uint32_t offset = a - SRAM_START;
+    if (offset < 0x2000) {
+      return SRAM[offset];
+    }
+  }
+  if (a < 0x800000) return FETCH8ROM(a);
+  if (a >= 0xFF0000) return FETCH8RAM(a);
+  return m68k_read_memory_8(a);
 }
 
 INLINE uint m68ki_read_16(uint address)
@@ -889,22 +902,49 @@ INLINE uint m68ki_read_32(uint address)
 
 INLINE void m68ki_write_8(uint address, uint value)
 {
-
   m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_DATA) /* auto-disable (see m68kcpu.h) */
-        if (ADDRESS_68K(address) >= 0xFF0000) {
-          WRITE8RAM(ADDRESS_68K(address), value);
-        } else
-        m68k_write_memory_8(ADDRESS_68K(address), value);
+
+  uint32_t a = ADDRESS_68K(address);
+
+  if (SRAM_ENABLED && SRAM != NULL && a >= SRAM_START && a <= SRAM_END) {
+    uint32_t offset = a - SRAM_START;
+    if (offset < 0x2000) {
+      SRAM[offset] = value & 0xFF;
+      genesis_save_mark_dirty_c();
+      return;
+    }
+  }
+
+  if (a >= 0xFF0000) {
+    WRITE8RAM(a, value);
+    return;
+  }
+
+  m68k_write_memory_8(a, value);
 }
 
 INLINE void m68ki_write_16(uint address, uint value)
 {
-
   m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_DATA) /* auto-disable (see m68kcpu.h) */
-        if (ADDRESS_68K(address) >= 0xFF0000) {
-          WRITE16RAM(ADDRESS_68K(address), value);
-        } else
-	m68k_write_memory_16(ADDRESS_68K(address), value);
+
+  uint32_t a = ADDRESS_68K(address);
+
+  if (SRAM_ENABLED && SRAM != NULL && a >= SRAM_START && (a + 1) <= SRAM_END) {
+    uint32_t offset = a - SRAM_START;
+    if ((offset + 1) < SRAM_SIZE) {
+      SRAM[offset]     = (value >> 8) & 0xFF;
+      SRAM[offset + 1] = value & 0xFF;
+      genesis_save_mark_dirty_c();
+      return;
+    }
+  }
+
+  if (a >= 0xFF0000) {
+    WRITE16RAM(a, value);
+    return;
+  }
+
+  m68k_write_memory_16(a, value);
 }
 
 INLINE void m68ki_write_32(uint address, uint value)

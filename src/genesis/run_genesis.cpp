@@ -6,6 +6,7 @@
 #include "genesis/run_genesis.h"
 #include "genesis_sound.h"
 #include "genesis_display.h"
+#include "genesis_save.h"
 #include "share/utils.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
@@ -174,19 +175,19 @@ static void run_one_frame() {
   }
 
   // FPS logging every 2 seconds
-  // frame_count++;
-  // uint64_t now = millis();
-  // if (now - last_fps_log_time >= 2000) {
-  //   float fps = (frame_count * 1000.0f) / (now - last_fps_log_time);
-  //   last_fps_log_time = now;
-  //   frame_count = 0;
-  //   // Log FPS + heap RAM 
-  //   printf("[FPS] ~%.1f fps | heap: %u\n", fps, heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-  // }
+  frame_count++;
+  uint64_t now = millis();
+  if (now - last_fps_log_time >= 2000) {
+    float fps = (frame_count * 1000.0f) / (now - last_fps_log_time);
+    last_fps_log_time = now;
+    frame_count = 0;
+    // Log FPS + heap RAM 
+    printf("[FPS] ~%.1f fps | heap: %u\n", fps, heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  }
 }
 
 /* Run genesis emulation with XIP mapped rom */
-extern "C" void run_genesis(const uint8_t* rom, size_t len) {
+extern "C" void run_genesis(const uint8_t* rom, size_t len, const char* rom_name) {
   M5Cardputer.Display.setSwapBytes(true);
 
   // Allocate buffers
@@ -195,8 +196,15 @@ extern "C" void run_genesis(const uint8_t* rom, size_t len) {
     genesis_alloc_audio_buffers();
   #endif
 
+  
   // Load the xip ROM into Gwenesis
   load_cartridge((unsigned char*)rom, len);
+
+  // Save
+  gwenesis_init_sram((uint8_t*)rom, (uint32_t)len);
+  printf("[SRAM] enabled=%d start=%08X end=%08X\n", SRAM_ENABLED, SRAM_START, SRAM_END);
+  genesis_save_init(rom_name);
+  genesis_save_load();
 
   // header ASCII "SEGA"0x100
   printf("[ROM] ptr=%p size=%u\n", rom, (unsigned)len);
@@ -230,6 +238,7 @@ extern "C" void run_genesis(const uint8_t* rom, size_t len) {
 
     // Emulate one frame
     run_one_frame();
+    genesis_save_tick();
 
     // Pacing to maintain target FPS
     if (frame_us > 0) {

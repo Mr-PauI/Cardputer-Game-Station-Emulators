@@ -53,6 +53,21 @@ __license__ = "GPLv3"
 #define GWENESIS_AUDIO_BUFFER_LENGTH_NTSC 888
 #define GWENESIS_AUDIO_BUFFER_LENGTH_PAL 1056
 
+extern uint8_t *SRAM;
+extern uint8_t SRAM_ENABLED;
+extern uint32_t SRAM_START;
+extern uint32_t SRAM_END;
+extern uint32_t SRAM_SIZE;
+
+#define SRAM_ADDR(x) (SRAM[(x) - SRAM_START])
+
+static uint32_t be32_read(const uint8_t *p) {
+  return ((uint32_t)p[0] << 24) |
+         ((uint32_t)p[1] << 16) |
+         ((uint32_t)p[2] << 8)  |
+         ((uint32_t)p[3]);
+}
+
 /* Audio buffer length */
 
 enum mapped_address
@@ -97,5 +112,6 @@ void set_region();
 
 void gwenesis_bus_save_state();
 void gwenesis_bus_load_state();
+void gwenesis_init_sram(uint8_t *rom, uint32_t rom_size);
 
 #endif
