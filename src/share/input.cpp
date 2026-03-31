@@ -83,8 +83,9 @@ namespace share
             M5Cardputer.Display.setBrightness(std::min(b + 2, 255));
         }
 
-        // Bright -
-        if (key(CARDPUTER_BRIGHT_DOWN)) {
+        // Bright - using cardputer adv UP/LEFT/ACTION at the same time 
+        // will also decrease brightness, check for up not pressed
+        if (key(CARDPUTER_BRIGHT_DOWN) && !key(CARDPUTER_UP_1)) {
             int b = M5Cardputer.Display.getBrightness();
             M5Cardputer.Display.setBrightness(std::max(b - 2, 0));
         }
