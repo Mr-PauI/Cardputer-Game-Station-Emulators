@@ -118,9 +118,9 @@ extern "C" void genesis_controller_poll() {
         M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_DOWN_2) ||
         M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_DOWN_3);
 
-    const bool btnAKey     = M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_BTN_A_1);
+    const bool btnAKey     = M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_BTN_A_2);
     const bool btnBKey     = M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_BTN_B);
-    const bool btnCKey     = M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_BTN_A_2);
+    const bool btnCKey     = M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_BTN_A_1);
     const bool btnStartKey = M5Cardputer.Keyboard.isKeyPressed(CARDPUTER_BTN_START);
 
     // Fusion clavier + I2C
