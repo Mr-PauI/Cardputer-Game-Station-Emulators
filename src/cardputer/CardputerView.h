@@ -15,22 +15,22 @@
 
 // PALETTE
 #define BACKGROUND_COLOR TFT_BLACK
-#define PRIMARY_COLOR 0xfc20
-#define RECT_COLOR_DARK 0x0841
-#define RECT_COLOR_LIGHT 0xd69a
-#define TEXT_COLOR 0xef7d 
-#define SMS_COLOR      0x1C9F  // Bleu clair (≈ #1E90FF)
-#define GENESIS_COLOR  0x32BB // Bleu cobalt  (≈ #2a2a9aff)
-#define NES_COLOR      0xFA47  // Rouge orange (≈ #FF4A3D)
-#define GAMEGEAR_COLOR 0xC29F  // Violet/magenta  (≈ #C050FF)
-#define NEOGEO_COLOR   0x05E8 // Vert (≈ #2a9333ff)
-#define WS_COLOR       0x07FF  // Cyan (≈ #00FFFF)
-#define ATARI_COLOR    0x2574  // Cyan sombre 
-#define PCE_COLOR      0xE81A
-#define LYNX_COLOR     0xD588  
-#define GAMEBOY_COLOR  0xFCD3
-#define SNES_COLOR     0xD024  // redish
-#define FOLDER_COLOR   0xFEC0  // Jaune pâle (≈ #F6EB61)
+#define PRIMARY_COLOR    0xFC20
+#define RECT_COLOR_DARK  0x0841
+#define RECT_COLOR_LIGHT 0xD69A
+#define TEXT_COLOR       0xEF7D
+#define SMS_COLOR        0x3D7F  // bleu clair 
+#define GENESIS_COLOR    0x43BF  // bleu 
+#define NES_COLOR        0xFA68  // rouge/orange 
+#define SNES_COLOR       0xD920  // rouge
+#define GAMEGEAR_COLOR   0xC29F
+#define NEOGEO_COLOR     0x05E8
+#define WS_COLOR         0x07FF
+#define ATARI_COLOR      0x2574
+#define PCE_COLOR        0xF0FC
+#define LYNX_COLOR       0xD588
+#define GAMEBOY_COLOR    0xFCD3
+#define FOLDER_COLOR     0xFEC0
 
 // TEXT SIZE
 #define TEXT_BIG 2
