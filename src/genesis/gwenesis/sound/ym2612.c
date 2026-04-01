@@ -809,7 +809,7 @@ INLINE void CSMKeyControll(FM_CH *CH)
   ym2612.OPN.SL3.key_csm = 1;
 }
 
-INLINE void IRAM_ATTR INTERNAL_TIMER_A()
+INLINE void INTERNAL_TIMER_A()
 {
   if (ym2612.OPN.ST.mode & 0x01)
   {
@@ -830,7 +830,7 @@ INLINE void IRAM_ATTR INTERNAL_TIMER_A()
   }
 }
 
-INLINE void IRAM_ATTR INTERNAL_TIMER_B(int step)
+INLINE void INTERNAL_TIMER_B(int step)
 {
   if (ym2612.OPN.ST.mode & 0x02)
   {
@@ -1063,7 +1063,7 @@ INLINE void set_sl_rr(FM_SLOT *SLOT,int v)
 }
 
 /* advance LFO to next sample */
-INLINE void IRAM_ATTR advance_lfo()
+INLINE void advance_lfo()
 {
   if (ym2612.OPN.lfo_timer_overflow)   /* LFO enabled ? */
   {
@@ -1249,7 +1249,7 @@ INLINE void advance_eg_channels(FM_CH *CH, unsigned int eg_cnt)
 }
 
 /* SSG-EG update process avoid unnecessary calculations */
-INLINE void IRAM_ATTR update_ssg_eg_channels_masked(FM_CH *CH, uint32_t mask /* 24 bits, 4 bits/chan */)
+INLINE void update_ssg_eg_channels_masked(FM_CH *CH, uint32_t mask /* 24 bits, 4 bits/chan */)
 {
   for (int ch = 0; ch < 6; ch++, CH++, mask >>= 4)
   {
@@ -1490,7 +1490,7 @@ INLINE void refresh_fc_eg_slot(FM_SLOT *SLOT , unsigned int fc , unsigned int kc
 }
 
 /* update phase increment counters */
-INLINE void IRAM_ATTR refresh_fc_eg_chan(FM_CH *CH )
+INLINE void refresh_fc_eg_chan(FM_CH *CH )
 {
   if( CH->SLOT[SLOT1].Incr==-1)
   {
@@ -1607,14 +1607,14 @@ INLINE void IRAM_ATTR chan_calc(FM_CH *CH, int num)
 
 
 /* clamp 14-bit branchless */
-static inline int IRAM_ATTR clamp14(int x) {
+static inline int  clamp14(int x) {
   if (x < -8192) x = -8192;
   if (x >  8191) x =  8191;
   return x;
 }
 
 /* zero out_fm[6] */
-static inline void IRAM_ATTR clear_out_fm(void) {
+static inline void clear_out_fm(void) {
   memset(out_fm, 0, 6*sizeof(out_fm[0]));
 }
 

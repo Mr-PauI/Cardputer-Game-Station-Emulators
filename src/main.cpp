@@ -176,7 +176,6 @@ void setup() {
 
   // Initialize I2C M5Stack JoyV2 if any
   share::detectI2cPad();
-  printf("12 after detectI2cPad: %u\n", esp_get_free_heap_size());
   
   printf("HEAP BEFORE EMU: %u bytes\n", esp_get_free_heap_size());
   printf("MAX BLOCK BEFORE EMU: %u bytes\n", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
@@ -221,7 +220,7 @@ void setup() {
       // --- SNES / Super Famicom ---
       display.displaySnesInfo();
       input.waitPress();
-      run_snes(get_rom_ptr(), get_rom_size());
+      run_snes(get_rom_ptr(), get_rom_size(), romName.c_str());
   }
   else if (ext == ROM_TYPE_ATARI7800) {
       // --- Atari 7800 ---

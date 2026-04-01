@@ -117,6 +117,8 @@ namespace share
         s_i2cPadType = I2C_PAD_NONE;
         printf("[INPUT] No I2C joystick found (SDA=%d, SCL=%d)\n",
                CARDPUTER_I2C_SDA, CARDPUTER_I2C_SCL);
+               
+        Wire.end();
     }
 
     bool hasI2cPad()

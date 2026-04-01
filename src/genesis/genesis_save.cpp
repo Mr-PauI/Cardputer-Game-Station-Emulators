@@ -146,6 +146,11 @@ static void SaveTask(void* /*arg*/) {
 /* ============================== API ============================ */
 
 extern "C" void genesis_save_init(const char* romPathOrName) {
+  if (!SRAM_ENABLED || !SRAM || SRAM_SIZE == 0) {
+    printf("[GEN][SAVE] task not started (no SRAM)\n");
+    return;
+  }
+
   if (!g_save_path) {
     g_save_path = (char*)malloc(PATH_MAX);
     if (!g_save_path) {
